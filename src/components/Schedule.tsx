@@ -157,6 +157,16 @@ export default function Schedule() {
   };
 
   const handleCellClick = (venueId: string, date: string, e: React.MouseEvent) => {
+    const slotOrders = getVenueDateOrders(venueId, date);
+    const hasAny = slotOrders.some((s) => s.order);
+
+    if (!hasAny) {
+      // All slots empty — go straight to new order (default: 午餐)
+      setNewOrderInfo({ date, slot: '午餐', venueId });
+      setPopover(null);
+      return;
+    }
+
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const spaceRight = window.innerWidth - rect.right;
     setPopover({
