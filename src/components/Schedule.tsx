@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { VENUES, STATUS_CELL_COLORS, STATUS_TEXT_COLORS } from '@/lib/constants';
+import { VENUES, ALL_SLOTS } from '@/lib/constants';
 import NewOrderModal from './NewOrderModal';
 import OrderDetailModal from './OrderDetailModal';
 
@@ -40,6 +40,20 @@ function formatDate(date: Date): string {
 
 const DAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
 
+const BAND_COLORS: Record<string, { bg: string; border: string }> = {
+  '待确认': { bg: '#FAEEDA', border: '#FAC775' },
+  '已确认': { bg: '#E1F5EE', border: '#9FE1CB' },
+  '已收款': { bg: '#EEEDFE', border: '#CECBF6' },
+  '已入账': { bg: '#E6F1FB', border: '#B5D4F4' },
+};
+
+const BAND_TEXT_COLORS: Record<string, string> = {
+  '待确认': '#8B5E1A',
+  '已确认': '#2D6A4F',
+  '已收款': '#5B3A8C',
+  '已入账': '#1B4F7A',
+};
+
 export default function Schedule() {
   const [range, setRange] = useState(14);
   const [startDate, setStartDate] = useState(() => {
@@ -55,9 +69,19 @@ export default function Schedule() {
   } | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
 
-  const today = formatDate(new Date());
+  // Popover state
+  const [popover, setPopover] = useState<{
+    venueId: string;
+    date: string;
+    x: number;
+    y: number;
+    locked: boolean;
+  } | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
-  // Generate date range
+  const today = formatDate(new Date());
+  const isCompact = range > 7;
+
   const dates = useMemo(() => {
     const arr: Date[] = [];
     for (let i = 0; i < range; i++) {
@@ -66,7 +90,6 @@ export default function Schedule() {
     return arr;
   }, [startDate, range]);
 
-  // Fetch orders
   const fetchOrders = async () => {
     const from = formatDate(dates[0]);
     const to = formatDate(dates[dates.length - 1]);
@@ -96,14 +119,59 @@ export default function Schedule() {
     return map;
   }, [orders]);
 
-  const handleCellClick = (date: string, slot: string, venueId: string) => {
-    const order = orderMap.get(`${date}|${slot}|${venueId}`);
-    if (order) {
-      setSelectedOrderId(order.id);
-    } else {
-      setNewOrderInfo({ date, slot, venueId });
-    }
+  // Get orders for a venue+date
+  const getVenueDateOrders = useCallback((venueId: string, date: string) => {
+    return ALL_SLOTS.map((slot) => ({
+      slot,
+      order: orderMap.get(`${date}|${slot}|${venueId}`) || null,
+    }));
+  }, [orderMap]);
+
+  // Close popover on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (popover?.locked && popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setPopover(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [popover]);
+
+  const handleCellHover = (venueId: string, date: string, e: React.MouseEvent) => {
+    if (popover?.locked) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const spaceRight = window.innerWidth - rect.right;
+    setPopover({
+      venueId,
+      date,
+      x: spaceRight > 280 ? rect.right + 8 : rect.left - 288,
+      y: Math.min(rect.top, window.innerHeight - 300),
+      locked: false,
+    });
   };
+
+  const handleCellLeave = () => {
+    if (popover?.locked) return;
+    setPopover(null);
+  };
+
+  const handleCellClick = (venueId: string, date: string, e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const spaceRight = window.innerWidth - rect.right;
+    setPopover({
+      venueId,
+      date,
+      x: spaceRight > 280 ? rect.right + 8 : rect.left - 288,
+      y: Math.min(rect.top, window.innerHeight - 300),
+      locked: true,
+    });
+  };
+
+  // Popover content
+  const popoverOrders = popover ? getVenueDateOrders(popover.venueId, popover.date) : [];
+  const popoverVenue = popover ? VENUES.find((v) => v.id === popover.venueId) : null;
+  const popoverHasOrders = popoverOrders.some((s) => s.order);
 
   return (
     <div className="flex flex-col h-full">
@@ -136,23 +204,14 @@ export default function Schedule() {
           />
         </label>
 
-        {/* Legend */}
+        {/* Legend — only colored statuses */}
         <div className="flex items-center gap-3 ml-auto text-[10px] text-[var(--ink3)]">
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-sm border border-[var(--border)]" /> 空闲
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-sm bg-[#FDF3E3]" /> 待确认
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-sm bg-[#EAF4EE]" /> 已确认
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-sm bg-[#F3EDF9]" /> 已收款
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-sm bg-[#EBF3FA]" /> 已入账
-          </span>
+          {Object.entries(BAND_COLORS).map(([status, colors]) => (
+            <span key={status} className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: colors.bg, border: `1px solid ${colors.border}` }} />
+              {status}
+            </span>
+          ))}
         </div>
       </div>
 
@@ -161,8 +220,7 @@ export default function Schedule() {
         <table className="cal-table">
           <thead>
             <tr>
-              <th className="venue-cell" style={{ left: 0 }}>场地</th>
-              <th className="slot-cell" style={{ left: 60 }}>时段</th>
+              <th className="venue-cell" style={{ left: 0, minWidth: 80 }}>场地</th>
               {dates.map((d) => {
                 const ds = formatDate(d);
                 const dow = d.getDay();
@@ -171,7 +229,8 @@ export default function Schedule() {
                 return (
                   <th
                     key={ds}
-                    className={`px-1 py-1 ${isToday ? 'bg-[var(--blue-bg)]' : ''}`}
+                    className={`px-1 py-1 ${isToday ? 'bg-[var(--green-bg)]' : ''}`}
+                    style={{ minWidth: isCompact ? 40 : 72 }}
                   >
                     <div className={`text-[10px] ${isWeekend ? 'text-[var(--red)]' : ''}`}>
                       周{DAY_NAMES[dow]}
@@ -179,72 +238,146 @@ export default function Schedule() {
                     <div className={`text-xs font-semibold ${isWeekend ? 'text-[var(--red)]' : ''}`}>
                       {d.getDate()}
                     </div>
-                    <div className="text-[10px] text-[var(--ink3)]">
-                      {d.getMonth() + 1}月
-                    </div>
+                    {!isCompact && (
+                      <div className="text-[10px] text-[var(--ink3)]">
+                        {d.getMonth() + 1}月
+                      </div>
+                    )}
                   </th>
                 );
               })}
             </tr>
           </thead>
           <tbody>
-            {VENUES.map((venue) =>
-              venue.slots.map((slot, slotIdx) => (
-                <tr key={`${venue.id}-${slot}`}>
-                  {slotIdx === 0 && (
-                    <td
-                      className="venue-cell"
-                      rowSpan={venue.slots.length}
-                      style={{ left: 0 }}
-                    >
-                      <div className="font-semibold text-xs">{venue.name}</div>
-                      <div className="text-[10px] text-[var(--ink3)]">{venue.capacity}</div>
-                    </td>
-                  )}
-                  <td className="slot-cell" style={{ left: 60 }}>
-                    {slot}
-                  </td>
-                  {dates.map((d) => {
-                    const ds = formatDate(d);
-                    const isToday = ds === today;
-                    const order = orderMap.get(`${ds}|${slot}|${venue.id}`);
+            {VENUES.map((venue) => (
+              <tr key={venue.id}>
+                <td className="venue-cell" style={{ left: 0, minWidth: 80 }}>
+                  <div className="font-semibold text-xs">{venue.name}</div>
+                  <div className="text-[10px] text-[var(--ink3)]">{venue.capacity}</div>
+                </td>
+                {dates.map((d) => {
+                  const ds = formatDate(d);
+                  const isToday = ds === today;
+                  const slotOrders = getVenueDateOrders(venue.id, ds);
+                  const hasAny = slotOrders.some((s) => s.order);
 
-                    return (
-                      <td
-                        key={ds}
-                        className={`cal-cell ${isToday ? 'today' : ''}`}
-                        style={
-                          order
-                            ? { backgroundColor: STATUS_CELL_COLORS[order.status] || 'transparent' }
-                            : undefined
-                        }
-                        onClick={() => handleCellClick(ds, slot, venue.id)}
-                        title={
-                          order
-                            ? `${order.client} ${order.pax}人 ${order.status}`
-                            : '点击新建预定'
-                        }
-                      >
-                        {order && (
-                          <div
-                            className="leading-tight"
-                            style={{ color: STATUS_TEXT_COLORS[order.status] }}
-                          >
-                            <div className="text-[11px] font-medium truncate max-w-[52px]">
-                              {order.client.slice(0, 4)}
+                  return (
+                    <td
+                      key={ds}
+                      className={`p-0.5 cursor-pointer transition hover:bg-[var(--bg2)] ${isToday ? 'bg-[var(--green-bg)]/30' : ''}`}
+                      onMouseEnter={(e) => handleCellHover(venue.id, ds, e)}
+                      onMouseLeave={handleCellLeave}
+                      onClick={(e) => handleCellClick(venue.id, ds, e)}
+                    >
+                      {/* 5 color bands */}
+                      <div className="flex gap-px" style={{ height: isCompact ? 32 : 48 }}>
+                        {slotOrders.map(({ slot, order }) => {
+                          const colors = order ? BAND_COLORS[order.status] : null;
+                          return (
+                            <div
+                              key={slot}
+                              className="flex-1 rounded-sm overflow-hidden flex items-center justify-center"
+                              style={
+                                colors
+                                  ? { backgroundColor: colors.bg, border: `1px solid ${colors.border}` }
+                                  : { backgroundColor: 'transparent' }
+                              }
+                            >
+                              {/* Show text only in 7-day view when has order */}
+                              {!isCompact && order && (
+                                <div className="text-center leading-none px-px" style={{ color: BAND_TEXT_COLORS[order.status] }}>
+                                  <div className="text-[8px] font-medium truncate" style={{ maxWidth: 48 }}>
+                                    {order.client.slice(0, 2)}
+                                  </div>
+                                  <div className="text-[7px]">{order.pax}人</div>
+                                </div>
+                              )}
                             </div>
-                            <div className="text-[9px]">{order.pax}人</div>
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))
-            )}
+                          );
+                        })}
+                      </div>
+                      {/* Small dot indicator for compact views with any bookings */}
+                      {isCompact && hasAny && (
+                        <div className="flex justify-center mt-0.5">
+                          <div className="w-1 h-1 rounded-full bg-[var(--green)]" />
+                        </div>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
+
+      {/* Popover */}
+      {popover && popoverVenue && (
+        <div
+          ref={popoverRef}
+          className="fixed z-40 bg-white rounded-lg shadow-lg border border-[var(--border)] w-[280px] max-h-[320px] overflow-y-auto"
+          style={{ left: popover.x, top: popover.y }}
+        >
+          <div className="px-3 py-2 border-b border-[var(--border)] bg-[var(--bg)]">
+            <div className="font-semibold text-sm">{popoverVenue.name}</div>
+            <div className="text-xs text-[var(--ink3)]">{popover.date}</div>
+          </div>
+          {!popoverHasOrders ? (
+            <div className="px-3 py-4 text-center text-xs text-[var(--ink3)]">
+              当天无预定，点击时段可新建
+            </div>
+          ) : (
+            <div className="divide-y divide-[var(--border2)]">
+              {popoverOrders.map(({ slot, order }) => (
+                <div
+                  key={slot}
+                  className="px-3 py-2 hover:bg-[var(--bg)] cursor-pointer transition"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (order) {
+                      setSelectedOrderId(order.id);
+                      setPopover(null);
+                    } else {
+                      setNewOrderInfo({ date: popover.date, slot, venueId: popover.venueId });
+                      setPopover(null);
+                    }
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-[var(--ink3)] w-10">{slot}</span>
+                    {order ? (
+                      <div className="flex-1 ml-2">
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm font-medium">{order.client}</span>
+                          <span
+                            className="text-[9px] px-1.5 py-0.5 rounded-full"
+                            style={{
+                              backgroundColor: BAND_COLORS[order.status]?.bg,
+                              color: BAND_TEXT_COLORS[order.status],
+                              border: `1px solid ${BAND_COLORS[order.status]?.border}`,
+                            }}
+                          >
+                            {order.status}
+                          </span>
+                        </div>
+                        <div className="text-xs text-[var(--ink3)]">
+                          {order.pax}人 · {order.action}
+                          {order.member_level !== '散客' && ` · ${order.member_level}`}
+                        </div>
+                        {order.note && (
+                          <div className="text-[10px] text-[var(--amber)] truncate">{order.note}</div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="flex-1 ml-2 text-xs text-[var(--ink3)]">空闲 — 点击新建</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* New Order Modal */}
       {newOrderInfo && (

@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>云吉合院 · 运营管理系统 v6</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+:root{--bg:#F7F5F2;--bg2:#EFECE8;--bg3:#E8E4DF;--white:#FFF;--ink:#1C1A17;--ink2:#5C5750;--ink3:#9A9389;--border:rgba(28,26,23,.12);--border2:rgba(28,26,23,.08);--green:#2D6A4F;--green-bg:#EAF4EE;--green-border:#A8D5B5;--amber:#8B5E1A;--amber-bg:#FDF3E3;--amber-border:#E8C07A;--red:#9B2335;--red-bg:#FCEEF0;--red-border:#E8A0AA;--blue:#1B4F7A;--blue-bg:#EBF3FA;--blue-border:#A3C9E8;--purple:#5B3A8C;--purple-bg:#F3EDF9;--radius:10px;--radius-sm:6px;--shadow:0 1px 3px rgba(0,0,0,.08),0 4px 12px rgba(0,0,0,.04)}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);font-family:'Noto Sans SC',sans-serif;color:var(--ink);font-size:14px}
+.app{display:flex;flex-direction:column;height:100vh;background:var(--white);overflow:hidden}
+#LS{display:flex;flex-direction:column;height:100vh;background:var(--white);max-width:480px;margin:0 auto}
+.lw{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:24px;padding:32px 24px}
+.mob-header{padding:14px 16px 10px;background:var(--white);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.ht{font-size:16px;font-weight:700}.hs{font-size:11px;color:var(--ink3);margin-top:1px}
+.rb{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:500;cursor:pointer}
+.rb-a{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.rb-i{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border)}
+.rb-v{background:var(--bg2);color:var(--ink2);border:1px solid var(--border)}
+.nav{display:flex;background:var(--white);border-bottom:1px solid var(--border);flex-shrink:0}
+.nav-sum{display:none}.nav-brand{display:none}
+.nb{flex:1;padding:10px 4px;border:none;background:0;font-family:inherit;font-size:11px;color:var(--ink3);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative;transition:color .15s}
+.nb:hover{color:var(--ink2)}.nb.on{color:var(--ink)}
+.nb.on::after{content:'';position:absolute;bottom:0;left:15%;right:15%;height:2px;background:var(--ink);border-radius:2px}
+.ni{font-size:16px;line-height:1}.nb.hid{display:none}
+@media(min-width:769px){
+.app{flex-direction:row}.mob-header{display:none}
+.nav{flex-direction:column;width:200px;min-width:200px;border-bottom:none;border-right:1px solid var(--border);padding:0;gap:0;overflow-y:auto;flex-shrink:0}
+.nav-brand{display:block!important;padding:14px 18px 12px;border-bottom:1px solid var(--border)}
+.nav-sum{display:block!important;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.nsi{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--ink2)}.nsv{font-weight:700}
+.nb{flex:none;flex-direction:row;padding:11px 18px;gap:10px;justify-content:flex-start;font-size:13px;border-bottom:1px solid var(--border2)}
+.nb.on::after{left:0;top:0;bottom:0;right:auto;width:3px;height:auto;border-radius:0 2px 2px 0}
+.ma{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.pgs{flex:1;overflow-y:auto}.pg{padding:24px 32px}
+.mets{grid-template-columns:repeat(4,1fr)}
+.dg{display:grid;grid-template-columns:1fr 1fr;gap:16px}.dg .card{margin-bottom:0}.dw{grid-column:1/-1}
+.fw{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}.fw .ff{grid-column:1/-1}
+.mo-inner{max-width:520px}
+.cell{position:relative}
+.ctip{display:none;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--ink);color:var(--white);font-size:12px;padding:6px 10px;border-radius:6px;white-space:nowrap;z-index:50;pointer-events:none}
+.ctip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:var(--ink)}
+.cell:hover .ctip{display:block}
+}
+.ma{display:flex;flex-direction:column;flex:1;min-width:0;overflow:hidden}
+.pgs{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.pg{display:none;padding:14px}.pg.on{display:block}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.ct{font-size:11px;font-weight:500;color:var(--ink3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.mets{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.met{background:var(--bg2);border-radius:var(--radius);padding:12px}
+.ml{font-size:10px;color:var(--ink3);margin-bottom:4px}
+.mv{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.mv.red{color:var(--red)}.mv.green{color:var(--green)}.mv.amber{color:var(--amber)}.mv.blue{color:var(--blue)}
+.ms{font-size:10px;color:var(--ink3);margin-top:3px}
+.bi{padding:12px;border-radius:var(--radius);border:1px solid var(--border);margin-bottom:8px;background:var(--white);position:relative;overflow:hidden;cursor:pointer;transition:border-color .15s}
+.bi:hover{border-color:var(--ink3)}
+.bi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.bi.s-confirmed::before{background:var(--green)}.bi.s-pending::before{background:var(--amber)}.bi.s-cancelled::before{background:var(--ink3)}.bi.s-settled::before{background:var(--blue)}.bi.s-paid::before{background:var(--purple)}
+.bi-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px}
+.bi-cl{font-size:14px;font-weight:500}
+.bi-tg{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.bi-m{font-size:12px;color:var(--ink2);line-height:1.6}
+.bi-n{font-size:11px;color:var(--ink3);margin-top:4px;padding:5px 8px;background:var(--bg2);border-radius:var(--radius-sm)}
+.bi-a{display:flex;gap:6px;margin-top:8px}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:500}
+.t-c{background:var(--green-bg);color:var(--green)}.t-p{background:var(--amber-bg);color:var(--amber)}.t-x{background:var(--bg2);color:var(--ink3)}.t-s{background:var(--blue-bg);color:var(--blue)}.t-pd{background:var(--purple-bg);color:var(--purple)}.t-ty{background:var(--bg2);color:var(--ink2)}.t-m{background:var(--purple-bg);color:var(--purple)}
+.alert{padding:10px 12px;border-radius:var(--radius-sm);font-size:12px;margin-bottom:8px;border:1px solid}
+.al-r{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
+.al-a{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border)}
+.al-g{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+/* Calendar */
+.cc{display:flex;gap:6px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
+.crb{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:0;font-family:inherit;font-size:12px;color:var(--ink2);cursor:pointer}
+.crb.on{background:var(--ink);color:var(--white);border-color:var(--ink)}
+.cleg{display:flex;gap:8px;margin-left:auto;font-size:10px;color:var(--ink3);align-items:center}
+.cld{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:2px;vertical-align:middle}
+.ctw{overflow-x:auto;margin:0 -14px;padding:0 14px}
+.calt{border-collapse:collapse;width:100%}.calt th{padding:0;border:none;background:var(--white)}.calt td{padding:2px;border:none}
+.dh{text-align:center;padding:6px 2px 8px}.dh-w{font-size:11px;display:block;color:var(--ink3)}.dh-n{font-size:16px;font-weight:700;display:block;line-height:1.3}.dh-m{font-size:10px;display:block;color:var(--ink3)}
+.dh.tod .dh-w,.dh.tod .dh-n{color:var(--blue)}.dh.we .dh-w,.dh.we .dh-n{color:var(--red)}
+.vl{padding:4px 8px 4px 0;text-align:right;vertical-align:middle}.vn{font-size:12px;font-weight:500;color:var(--ink2);white-space:nowrap}.vc{font-size:10px;color:var(--ink3)}
+.sll{padding:2px 6px 2px 0;text-align:right;vertical-align:middle}.slb{font-size:10px;color:var(--ink3);white-space:nowrap}
+.cell{border:.5px solid var(--border2);border-radius:4px;vertical-align:middle;cursor:pointer;height:42px;padding:4px 6px;min-width:80px;transition:background .1s}
+.cell:hover{background:var(--bg2)}.cell:active{opacity:.8}
+.cell.free{background:var(--white)}.cell.s-pending{background:var(--amber-bg)}.cell.s-confirmed{background:var(--green-bg)}.cell.s-settled{background:var(--blue-bg)}.cell.s-paid{background:var(--purple-bg)}
+.cell.ctod{outline:1.5px solid var(--blue);outline-offset:-1px}
+.vsep .cell,.vsep .vl,.vsep .sll{border-top:1.5px solid var(--border)}
+.ci{display:flex;flex-direction:column;justify-content:center;height:100%;gap:2px}
+.cn{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cn.green{color:var(--green)}.cn.amber{color:var(--amber)}.cn.blue{color:var(--blue)}.cn.purple{color:var(--purple)}
+.cm{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink3)}
+/* Modal */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:none;align-items:center;justify-content:center;padding:16px}.mo.on{display:flex}
+.mo-inner{background:var(--white);border-radius:var(--radius);padding:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+.mo-t{font-size:15px;font-weight:700;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.mo-close{background:0;border:0;font-size:20px;color:var(--ink3);cursor:pointer;padding:0 4px}
+.mo-b{font-size:13px;color:var(--ink2);line-height:1.6}
+.mo-a{display:flex;gap:8px;margin-top:16px}.mo-a .btn{flex:1}
+/* Forms */
+.fst{font-size:10px;font-weight:500;color:var(--ink3);letter-spacing:.06em;margin:14px 0 8px}
+.fr{display:grid;gap:10px;margin-bottom:10px}.c2{grid-template-columns:1fr 1fr}.c3{grid-template-columns:1fr 1fr 1fr}.c4{grid-template-columns:1fr 1fr 1fr 1fr}
+.fl label{font-size:11px;color:var(--ink2);display:block;margin-bottom:4px}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:inherit;font-size:13px;color:var(--ink);background:var(--white);-webkit-appearance:none}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink2)}
+textarea{resize:none;height:60px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.chip{padding:5px 12px;border-radius:20px;font-size:12px;border:1px solid var(--border);cursor:pointer;background:0;color:var(--ink2);font-family:inherit}.chip.on{background:var(--ink);color:var(--white);border-color:var(--ink)}
+.achip{padding:5px 12px;border-radius:20px;font-size:12px;border:1px solid var(--green-border);cursor:pointer;background:0;color:var(--green);font-family:inherit}.achip.on{background:var(--green);color:var(--white)}
+.cfw{background:var(--red-bg);border:1px solid var(--red-border);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--red);margin-bottom:8px;display:none}
+.rvp{font-size:12px;color:var(--green);font-weight:500;min-height:16px;margin-top:6px}
+.divl{border:none;border-top:1px solid var(--border);margin:14px 0}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:9px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);background:0;font-family:inherit;font-size:13px;color:var(--ink);cursor:pointer;transition:all .15s}.btn:hover{background:var(--bg2)}
+.btn-p{background:var(--ink);color:var(--white);border-color:var(--ink);width:100%;padding:13px;font-size:14px;font-weight:500;border-radius:var(--radius);margin-top:4px}
+.btn-s{padding:5px 12px;font-size:11px}
+.btn-g{color:var(--green);border-color:var(--green-border);background:var(--green-bg)}
+.btn-r{color:var(--red);border-color:var(--red-border);background:var(--red-bg)}
+.btn-b{color:var(--blue);border-color:var(--blue-border);background:var(--blue-bg)}
+.btn-pu{color:var(--purple);border-color:#C4A8E0;background:var(--purple-bg)}
+.empty{text-align:center;padding:24px 16px;color:var(--ink3);font-size:13px}
+.fbar{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px}.fbar::-webkit-scrollbar{display:none}
+.fc{flex-shrink:0;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:0;font-family:inherit;font-size:12px;color:var(--ink2);cursor:pointer;white-space:nowrap}.fc.on{background:var(--ink);color:var(--white);border-color:var(--ink)}
+.db{height:6px;border-radius:3px;background:var(--bg3);margin-top:6px;overflow:hidden}
+.dbf{height:100%;border-radius:3px;transition:width .5s}
+.dri{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border2);font-size:13px}.dri:last-child{border-bottom:none}
+.mc{padding:12px;border-radius:var(--radius);border:1px solid var(--border);margin-bottom:8px;background:var(--white);cursor:pointer;transition:border-color .15s}.mc:hover{border-color:var(--ink3)}
+.mav{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.sw{position:relative;margin-bottom:12px}.sw input{padding-left:36px}
+.swi{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--ink3);font-size:14px;pointer-events:none}
+.ei{padding:12px;border-radius:var(--radius);border:1px solid var(--border);margin-bottom:8px;background:var(--white);position:relative;overflow:hidden}
+.ei::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.ei.sp::before{background:var(--amber)}.ei.sa::before{background:var(--green)}.ei.sib::before{background:var(--blue)}
+.fns{margin-bottom:16px}
+.fnst{font-size:12px;font-weight:500;color:var(--ink2);padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:8px;display:flex;justify-content:space-between}
+.ac-wrap{position:relative}.ac-list{position:absolute;top:100%;left:0;right:0;background:var(--white);border:1px solid var(--border);border-radius:var(--radius-sm);max-height:160px;overflow-y:auto;z-index:10;display:none;box-shadow:var(--shadow)}.ac-list.on{display:block}
+.ac-item{padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border2)}.ac-item:hover{background:var(--bg2)}.ac-item:last-child{border-bottom:none}
+.stars{display:inline-flex;gap:2px}.star{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--white);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;color:var(--ink3)}.star.on{background:var(--amber-bg);border-color:var(--amber-border);color:var(--amber)}
+/* Day section in homepage */
+.day-section{margin-bottom:16px}
+.day-title{font-size:13px;font-weight:700;color:var(--ink);padding:8px 0 6px;display:flex;justify-content:space-between;align-items:center}
+.day-badge{font-size:11px;font-weight:500;padding:2px 10px;border-radius:20px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+<!-- LOGIN -->
+<div id="LS"><div style="padding:14px 16px 10px;border-bottom:1px solid var(--border)"><div class="ht">云吉合院</div><div class="hs">运营管理系统</div></div>
+<div class="lw"><div style="text-align:center"><div style="font-size:28px;font-weight:700">云吉合院</div><div style="font-size:12px;color:var(--ink3);margin-top:8px">请输入密码</div></div>
+<div style="width:100%;max-width:280px;display:flex;flex-direction:column;gap:10px"><div class="fl"><label>密码</label><input type="password" id="pw" placeholder="请输入密码" onkeydown="if(event.key==='Enter')doLogin()"></div><button class="btn btn-p" onclick="doLogin()">进入系统</button><div id="le" style="font-size:11px;color:var(--red);text-align:center;display:none">密码错误</div></div></div></div>
+
+<!-- MAIN -->
+<div id="MS" style="display:none;flex:1;overflow:hidden">
+<div class="mob-header"><div><div class="ht">云吉合院</div><div class="hs" id="hd"></div></div><span class="rb" id="r1" onclick="logout()"></span></div>
+<div class="nav">
+<div class="nav-brand"><div style="font-size:16px;font-weight:700">云吉合院</div><div style="font-size:11px;color:var(--ink3);margin-top:2px" id="dd"></div><div style="margin-top:8px"><span class="rb" id="r2" onclick="logout()"></span></div></div>
+<div class="nav-sum" id="ns"></div>
+<button class="nb on" onclick="go('home',this)" id="n-home"><span class="ni">&#9750;</span><span>首页</span></button>
+<button class="nb" onclick="go('cal',this)"><span class="ni">&#9783;</span><span>档期</span></button>
+<button class="nb" onclick="go('order',this)"><span class="ni">&#9776;</span><span>订单</span></button>
+<button class="nb" onclick="go('fin',this)" id="n-fin"><span class="ni">&#9830;</span><span>财务</span></button>
+<button class="nb" onclick="go('mem',this)"><span class="ni">&#9679;</span><span>会员</span></button>
+<button class="nb" onclick="go('biz',this)"><span class="ni">&#9733;</span><span>商务</span></button>
+<button class="nb" onclick="go('dash',this)" id="n-dash"><span class="ni">&#9638;</span><span>总览</span></button>
+</div>
+<div class="ma"><div class="pgs">
+
+<!-- HOME = Employee Workbench -->
+<div class="pg on" id="p-home">
+<div id="home-alerts"></div>
+<div id="home-days"></div>
+<div class="card" id="home-todo-card"><div class="ct">待办事项</div><div id="home-todo"></div></div>
+<div class="card" id="home-feedback-card"><div class="ct">最近服务反馈</div><div id="home-feedback"></div></div>
+</div>
+
+<!-- CALENDAR -->
+<div class="pg" id="p-cal">
+<div class="cc">
+<button class="crb on" onclick="setR(7,this)">7天</button><button class="crb" onclick="setR(14,this)">14天</button><button class="crb" onclick="setR(30,this)">30天</button><button class="crb" onclick="setR(60,this)">60天</button>
+<div style="margin-left:8px"><input type="date" id="cal-jump" style="padding:5px 10px;font-size:12px;width:140px" onchange="jumpCal()"></div>
+<div class="cleg"><span><span class="cld" style="background:var(--white);border:1px solid var(--border)"></span>空</span><span><span class="cld" style="background:var(--amber-bg);border:1px solid var(--amber-border)"></span>待确认</span><span><span class="cld" style="background:var(--green-bg);border:1px solid var(--green-border)"></span>已确认</span><span><span class="cld" style="background:var(--purple-bg);border:1px solid #C4A8E0"></span>已收款</span><span><span class="cld" style="background:var(--blue-bg);border:1px solid var(--blue-border)"></span>已入账</span></div>
+</div>
+<div class="ctw"><table class="calt" id="caltb"></table></div>
+</div>
+
+<!-- ORDER (merged booking + billing) -->
+<div class="pg" id="p-order">
+<div class="fbar" id="ord-bar"></div>
+<div id="ord-list"></div>
+</div>
+
+<!-- FINANCE -->
+<div class="pg" id="p-fin"><div class="dg">
+<div class="card"><div class="ct">收入确认</div><div class="fns"><div class="fnst">待入账 <span id="fic" style="color:var(--amber);font-weight:700"></span></div><div id="fip"></div></div><div class="fns"><div class="fnst">本月已入账 <span id="fit" style="color:var(--green);font-weight:700"></span></div><div id="fid"></div></div></div>
+<div class="card"><div class="ct">支出管理</div><div id="fef"></div><div class="fns" style="margin-top:12px"><div class="fnst">待审批 <span id="fec" style="color:var(--amber);font-weight:700"></span></div><div id="fep"></div></div><div class="fns"><div class="fnst">本月已审批 <span id="fet" style="color:var(--green);font-weight:700"></span></div><div id="fed"></div></div></div>
+</div></div>
+
+<!-- MEMBER -->
+<div class="pg" id="p-mem">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div class="sw" style="flex:1;margin-bottom:0;margin-right:10px"><span class="swi">&#128269;</span><input type="text" id="mq" placeholder="搜索会员" oninput="rMem()"></div><button class="btn btn-s btn-pu" id="mab" onclick="showMemForm()" style="display:none">+ 新建会员</button></div>
+<div class="fbar" style="margin-bottom:12px"><button class="fc on" onclick="smf('',this)">全部</button><button class="fc" onclick="smf('承吉',this)">承吉</button><button class="fc" onclick="smf('享吉',this)">享吉</button><button class="fc" onclick="smf('逢吉',this)">逢吉</button><button class="fc" onclick="smf('开吉',this)">开吉</button><button class="fc" onclick="smf('云集旧会员',this)">云集旧</button></div>
+<div id="mem-stats" style="margin-bottom:12px"></div><div id="mem-list"></div>
+</div>
+
+<!-- BUSINESS -->
+<div class="pg" id="p-biz">
+<div class="card"><div class="ct">商务提成（本月）</div><div id="biz-sum"></div></div>
+<div class="card"><div class="ct">商务业绩排行</div><div id="biz-rank"></div></div>
+<div class="card"><div class="ct">提成规则</div><div style="font-size:13px;color:var(--ink2);line-height:1.8"><strong>餐饮消费</strong>：8%（次月实收后结算）<br><strong>储值/年费</strong>：10%（到账后一次性，储值消费不再计提）<br><strong>提成跟预定走</strong>：每笔填了谁算谁的<br><strong>散客自来</strong>：未填介绍人则无提成<br><strong>旧云集客户</strong>：不计提成</div></div>
+</div>
+
+<!-- DASHBOARD = Boss view -->
+<div class="pg" id="p-dash">
+<div class="mets" id="dash-met"></div>
+<div class="dg">
+<div class="card"><div class="ct">本月收入构成</div><div id="dash-rev"></div></div>
+<div class="card"><div class="ct">成本控制</div><div id="dash-cost"></div></div>
+<div class="card"><div class="ct">商务贡献</div><div id="dash-biz"></div></div>
+<div class="card"><div class="ct">会员进度</div><div id="dash-mp"></div></div>
+</div>
+</div>
+
+</div></div></div></div>
+
+<!-- Modal -->
+<div class="mo" id="mo"><div class="mo-inner"><div class="mo-t"><span id="mot"></span><button class="mo-close" onclick="clM()">&times;</button></div><div class="mo-b" id="mob"></div><div class="mo-a" id="moa"></div></div></div>
+
+<script>
+const Y='\u00A5',WD=['周日','周一','周二','周三','周四','周五','周六'];
+const DISC={散客:1,逢吉:1,承吉:.88,享吉:.75,开吉:.6,云集旧会员:.9,股东:.6},RACK=1000,DFC=15960,FR=.35;
+const VN=[{id:'north',n:'北厢房',c:'14人',s:['午餐','下午茶','晚餐']},{id:'south',n:'南厢房',c:'8人',s:['午餐','下午茶','晚餐']},{id:'east',n:'东厢房',c:'4人',s:['午餐','下午茶','晚餐']},{id:'west',n:'西厢房',c:'4人',s:['午餐','下午茶','晚餐']},{id:'sky',n:'天窗厅',c:'12人',s:['午餐','下午茶','晚餐']},{id:'cloud',n:'云徕厅',c:'10人',s:['午餐','下午茶','晚餐']},{id:'banq',n:'宴会厅',c:'40+',s:['上午会议','午餐/午宴','下午会议','晚宴']},{id:'ktv',n:'KTV',c:'25人',s:['下午场','晚场']}];
+const SS={'午餐':'午','下午茶':'茶','晚餐':'晚','上午会议':'上午','午餐/午宴':'午宴','下午会议':'下午','晚宴':'晚宴','下午场':'下午','晚场':'晚','全天':'全天'};
+const PA=['吃饭','喝茶','唱歌','开会','活动','商务会谈','生日宴','婚宴'];
+const EC=['食材采购','水电费','物业费','维修','办公用品','交通','活动费用','其他'];
+const PWS={zhangze123:'approve','666':'input','1658666':'view'};
+const sC={'已确认':'s-confirmed','待确认':'s-pending','已取消':'s-cancelled','已收款':'s-paid','已入账':'s-settled'};
+const sT={'已确认':'t-c','待确认':'t-p','已取消':'t-x','已收款':'t-pd','已入账':'t-s'};
+
+let role='',O=[],B=[],M=[],E=[],rd=7,calStart='',nid=10,nbid=3,neid=4,nmid=8,oFilt='',oType='',mFilt='',linkedMem=null;
+
+function initData(){
+  const t=td(),t1=ad(t,1),t2=ad(t,2),t3=ad(t,3),tm=ad(t,-1);
+  O=[
+    {id:1,date:t,slot:'午餐',type:'餐饮',venues:['north'],client:'许总',phone:'13812346688',member:'承吉',ret:'老客',pax:12,bd:'',dep:2000,note:'老客户',action:'吃饭',status:'已确认',est:10560,memId:1},
+    {id:2,date:t,slot:'晚餐',type:'餐饮',venues:['south','east'],client:'品品',phone:'13922002200',member:'散客',ret:'老客',pax:8,bd:'',dep:1000,note:'',action:'吃饭',status:'已确认',est:8000,memId:6},
+    {id:3,date:t1,slot:'晚餐',type:'餐饮',venues:['north'],client:'甘总',phone:'13655005500',member:'散客',ret:'新客',pax:14,bd:'李明',dep:0,note:'商务推荐新客',action:'商务会谈',status:'待确认',est:14000,memId:null},
+    {id:4,date:t1,slot:'午餐',type:'餐饮',venues:['sky'],client:'安总',phone:'13733003300',member:'享吉',ret:'老客',pax:10,bd:'',dep:3000,note:'75折',action:'吃饭',status:'已确认',est:7500,memId:2},
+    {id:5,date:t2,slot:'全天',type:'活动/会议',venues:['banq'],client:'孟总',phone:'13511001100',member:'散客',ret:'老客',pax:35,bd:'',dep:10000,note:'合作伙伴活动',action:'活动',status:'已确认',est:0,memId:null},
+    {id:6,date:t2,slot:'晚餐',type:'餐饮',venues:['east'],client:'超总',phone:'13377007700',member:'散客',ret:'老客',pax:4,bd:'',dep:500,note:'',action:'吃饭',status:'已确认',est:4000,memId:5},
+    {id:7,date:t3,slot:'晚餐',type:'餐饮',venues:['north'],client:'连先生',phone:'13144004400',member:'逢吉',ret:'老客',pax:8,bd:'',dep:0,note:'储值会员',action:'吃饭',status:'待确认',est:8000,memId:3},
+    {id:8,date:tm,slot:'晚餐',type:'餐饮',venues:['north','south'],client:'张总宴请',phone:'',member:'股东',ret:'老客',pax:18,bd:'',dep:5000,note:'股东宴请6折',action:'吃饭',status:'已入账',est:10800,memId:null},
+    {id:9,date:tm,slot:'晚场',type:'KTV',venues:['ktv'],client:'许总',phone:'13812346688',member:'承吉',ret:'老客',pax:15,bd:'',dep:2000,note:'',action:'唱歌',status:'已入账',est:0,memId:1}
+  ];
+  B=[
+    {id:1,oid:8,date:tm,client:'张总宴请',pax:18,member:'股东',food:6500,total:10800,paid:10800,method:'微信',confirmed:1,memId:null,bdName:'',bdComm:0,butler:'小王',server:'小李',chef:'张厨',stars:5},
+    {id:2,oid:9,date:tm,client:'许总',pax:15,member:'承吉',food:0,total:3500,paid:3500,method:'储值扣减',confirmed:1,memId:1,bdName:'',bdComm:0,butler:'',server:'小赵',chef:'',stars:4}
+  ];
+  M=[
+    {id:1,name:'许总',phone:'13812346688',level:'承吉',bal:32000,exp:'2026-12-31',debt:77600,spent:128000,vis:24,disc:.88,note:'高频客户，多次带客'},
+    {id:2,name:'安总',phone:'13733003300',level:'享吉',bal:18000,exp:'2026-10-15',debt:35600,spent:86000,vis:16,disc:.75,note:'75折老会员'},
+    {id:3,name:'连先生',phone:'13144004400',level:'逢吉',bal:65000,exp:'2027-03-01',debt:0,spent:35000,vis:8,disc:1,note:'储值10万'},
+    {id:4,name:'甘总',phone:'13655005500',level:'云集旧会员',bal:0,exp:'',debt:27000,spent:42000,vis:12,disc:.9,note:'旧云集余额2.7万'},
+    {id:5,name:'超总',phone:'13377007700',level:'云集旧会员',bal:0,exp:'',debt:4300,spent:38000,vis:15,disc:.85,note:'高频'},
+    {id:6,name:'品品',phone:'13922002200',level:'云集旧会员',bal:0,exp:'',debt:0,spent:52000,vis:18,disc:.9,note:'高频'},
+    {id:7,name:'王总',phone:'13288008800',level:'散客',bal:0,exp:'',debt:0,spent:15000,vis:3,disc:1,note:'商务推荐新客'}
+  ];
+  E=[
+    {id:1,date:tm,cat:'食材采购',amt:8500,sup:'东方鲁瑞',note:'昨日食材',by:'财务',status:'已审批',who:'老板'},
+    {id:2,date:t,cat:'食材采购',amt:6200,sup:'东方鲁瑞',note:'今日备菜',by:'财务',status:'待审批',who:''},
+    {id:3,date:t,cat:'水电费',amt:3800,sup:'国网',note:'3月电费',by:'财务',status:'待审批',who:''}
+  ];
+}
+
+// Helpers
+function td(){return new Date().toISOString().split('T')[0]}
+function ad(s,n){const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().split('T')[0]}
+function fD(s){const d=new Date(s+'T00:00:00');return(d.getMonth()+1)+'月'+d.getDate()+'日 '+WD[d.getDay()]}
+function fM(n){return n>=10000?(n/10000).toFixed(1)+'万':n.toLocaleString()}
+function dA(sl,ty){if(ty==='KTV')return'唱歌';if(sl&&sl.includes('会议'))return'开会';if(ty==='活动/会议')return'活动';if(sl==='下午茶'||ty==='茶苑')return'喝茶';return'吃饭'}
+function isD(){return innerWidth>=769}
+function can(a){if(role==='approve')return true;if(role==='input')return a!=='approve_expense';return false}
+function gvn(ids){return ids.map(id=>VN.find(x=>x.id===id)?.n||id).join('+')}
+function starH(n,sz){sz=sz||13;return n>0?Array.from({length:5},(_,i)=>`<span style="color:${i<n?'var(--amber)':'var(--ink3)'};font-size:${sz}px">${i<n?'\u2605':'\u2606'}</span>`).join(''):''}
+function maskPh(p){if(!p)return'';if(role==='approve')return p;if(p.length>=7)return p.slice(0,3)+'****'+p.slice(-4);return p}
+// Auth
+function doLogin(){const p=document.getElementById('pw').value,r=PWS[p];if(r){role=r;document.getElementById('LS').style.display='none';document.getElementById('MS').style.display='flex';const lb={approve:'老板',input:'客服/财务',view:'领班/BD'},cl={approve:'rb-a',input:'rb-i',view:'rb-v'};['r1','r2'].forEach(id=>{const e=document.getElementById(id);e.textContent=lb[r];e.className='rb '+cl[r]});document.getElementById('n-fin').classList.toggle('hid',r==='view');document.getElementById('mab').style.display=can('input')?'':'none';const d=new Date(),ds=d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日 '+WD[d.getDay()];document.getElementById('hd').textContent=ds;document.getElementById('dd').textContent=ds;calStart=td();if(r==='approve'){go('dash',document.getElementById('n-dash'))}else{rAll()}}else document.getElementById('le').style.display='block'}
+function logout(){role='';document.getElementById('LS').style.display='';document.getElementById('MS').style.display='none';document.getElementById('pw').value='';document.getElementById('le').style.display='none'}
+
+function go(id,el){document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));document.getElementById('p-'+id).classList.add('on');if(el)el.classList.add('on');({home:rHome,cal:rCal,order:rOrd,fin:rFin,mem:rMem,biz:rBiz,dash:rDash})[id]?.()}
+function rAll(){rHome();rNS()}
+function rNS(){
+  const t=td(),pend=O.filter(o=>o.status==='待确认'&&o.date>=t).length;
+  const ic=B.filter(b=>!b.confirmed).length;
+  const ep=E.filter(e=>e.status==='待审批').length;
+  const tb=O.filter(o=>o.date===t&&o.status!=='已取消');
+  const tables=tb.filter(o=>o.type==='餐饮').length;
+  let h=`<div class="nsi"><span>今日</span><span class="nsv" style="color:${tables>=4?'var(--green)':tables>0?'var(--amber)':'var(--red)'}">${tables>0?tables+'桌':'空档'}</span></div><div class="nsi"><span>待确认</span><span class="nsv" style="color:${pend>0?'var(--amber)':'var(--green)'}">${pend}</span></div>`;
+  if(role!=='view')h+=`<div class="nsi"><span>待入账</span><span class="nsv" style="color:${ic>0?'var(--purple)':'var(--green)'}">${ic}</span></div>`;
+  if(role==='approve')h+=`<div class="nsi"><span>待审批</span><span class="nsv" style="color:${ep>0?'var(--red)':'var(--green)'}">${ep}</span></div>`;
+  document.getElementById('ns').innerHTML=h;
+}
+
+// ══════ HOME = Employee Workbench ══════
+function rHome(){
+  const t=td();
+  // Alerts
+  let al='';
+  const pend=O.filter(o=>o.status==='待确认'&&o.date>=t).length;
+  const ic=B.filter(b=>!b.confirmed).length;
+  const ep=E.filter(e=>e.status==='待审批').length;
+  if(pend>0)al+=`<div class="alert al-a">${pend} 条预定待确认，请尽快联系客户</div>`;
+  if(ic>0&&role!=='view')al+=`<div class="alert al-a">${ic} 笔收入待财务入账</div>`;
+  if(ep>0&&role==='approve')al+=`<div class="alert al-r">${ep} 笔支出待审批</div>`;
+  document.getElementById('home-alerts').innerHTML=al;
+
+  // 3 days
+  let dh='';
+  [0,1,2].forEach(offset=>{
+    const d=ad(t,offset);
+    const label=['今天','明天','后天'][offset];
+    const dayO=O.filter(o=>o.date===d&&o.status!=='已取消');
+    const tables=dayO.filter(o=>o.type==='餐饮').length;
+    const pax=dayO.reduce((s,o)=>s+o.pax,0);
+    const isEmpty=dayO.length===0;
+    dh+=`<div class="day-section"><div class="day-title"><span>${label} · ${fD(d)}</span>`;
+    if(isEmpty)dh+=`<span class="day-badge" style="background:var(--red-bg);color:var(--red)">空档</span>`;
+    else dh+=`<span class="day-badge" style="background:var(--green-bg);color:var(--green)">${tables}桌 · ${pax}人</span>`;
+    dh+=`</div>`;
+    if(isEmpty){
+      dh+=`<div style="padding:12px;color:var(--ink3);font-size:13px;background:var(--bg2);border-radius:var(--radius);text-align:center">${offset===0?'今日空档，固定成本'+DFC.toLocaleString()+'元仍在产生':'暂无预定，建议联系客户填桌'}</div>`;
+    } else {
+      dayO.forEach(o=>{
+        const act=o.action||dA(o.slot,o.type);
+        dh+=`<div class="bi ${sC[o.status]||'s-pending'}" onclick="showOrder(${o.id})" style="margin-bottom:6px">
+          <div class="bi-top"><div class="bi-cl">${o.client}</div><div class="bi-tg"><span class="tag ${sT[o.status]}">${o.status}</span><span class="tag t-ty">${o.slot}</span>${o.member&&o.member!=='散客'?`<span class="tag t-m">${o.member}</span>`:''}</div></div>
+          <div class="bi-m">${gvn(o.venues)} · ${o.pax}人 · ${act}${o.bd?' · 商务:'+o.bd:''}</div>
+          ${o.note?`<div class="bi-n">${o.note}</div>`:''}
+        </div>`;
+      });
+    }
+    dh+=`</div>`;
+  });
+  document.getElementById('home-days').innerHTML=dh;
+
+  // Todo
+  const todos=[];
+  O.filter(o=>o.status==='待确认'&&o.date>=t).forEach(o=>todos.push(`<span style="color:var(--amber)">待确认</span> ${o.client} · ${fD(o.date)} ${o.slot}`));
+  const unpaid=O.filter(o=>o.status==='已确认'&&o.date<=t);
+  unpaid.forEach(o=>todos.push(`<span style="color:var(--blue)">待结账</span> ${o.client} · ${fD(o.date)}`));
+  document.getElementById('home-todo').innerHTML=todos.length?todos.map(t=>`<div style="padding:6px 0;border-bottom:1px solid var(--border2);font-size:13px">${t}</div>`).join(''):'<div class="empty" style="padding:12px">暂无待办</div>';
+
+  // Recent feedback
+  const fb=B.filter(b=>b.stars>0).sort((a,b)=>b.id-a.id).slice(0,3);
+  document.getElementById('home-feedback').innerHTML=fb.length?fb.map(b=>`<div style="padding:6px 0;border-bottom:1px solid var(--border2);font-size:13px;display:flex;justify-content:space-between"><span>${b.client} · ${fD(b.date)}</span><span>${starH(b.stars,12)}</span></div>`).join(''):'<div class="empty" style="padding:12px">暂无评价</div>';
+  rNS();
+}
+
+// ══════ CALENDAR ══════
+function setR(n,el){rd=n;document.querySelectorAll('.crb').forEach(b=>b.classList.remove('on'));el.classList.add('on');rCal()}
+function jumpCal(){const v=document.getElementById('cal-jump').value;if(v){calStart=v;rCal()}}
+function rCal(){
+  if(!calStart)calStart=td();
+  const days=Array.from({length:rd},(_,i)=>ad(calStart,i)),t=td();
+  let h='<thead><tr><th style="min-width:60px"></th><th style="min-width:28px"></th>';
+  days.forEach(d=>{const dd=new Date(d+'T00:00:00'),wd=dd.getDay();h+=`<th><div class="dh${d===t?' tod':''}${wd===0||wd===6?' we':''}"><span class="dh-w">${WD[wd]}</span><span class="dh-n">${dd.getDate()}</span><span class="dh-m">${dd.getMonth()+1}月</span></div></th>`});
+  h+='</tr></thead><tbody>';
+  VN.forEach((v,vi)=>{v.s.forEach((sl,si)=>{
+    h+=`<tr${si===0&&vi>0?' class="vsep"':''}>`;
+    if(si===0)h+=`<td class="vl" rowspan="${v.s.length}"><div class="vn">${v.n}</div><div class="vc">${v.c}</div></td>`;
+    h+=`<td class="sll"><span class="slb">${SS[sl]||sl}</span></td>`;
+    days.forEach(d=>{
+      const o=O.find(x=>x.date===d&&x.status!=='已取消'&&x.venues.includes(v.id)&&(x.slot===sl||x.slot==='全天'));
+      let cls='free',inner='',tip='';
+      if(o){const st=o.status==='已入账'?'s-settled':o.status==='已收款'?'s-paid':o.status==='已确认'?'s-confirmed':'s-pending';cls=st;
+        const nc=o.status==='已入账'?'blue':o.status==='已收款'?'purple':o.status==='已确认'?'green':'amber';
+        inner=`<div class="ci"><span class="cn ${nc}">${o.client.slice(0,4)}</span><span class="cm">${o.pax}人</span></div>`;
+        tip=`<div class="ctip">${o.client} · ${o.pax}人 · ${o.action||dA(sl,o.type)} · ${o.status}</div>`;
+        h+=`<td class="cell ${cls}${d===t?' ctod':''}" onclick="showOrder(${o.id})">${tip}${inner}</td>`;
+      } else {
+        h+=`<td class="cell free${d===t?' ctod':''}" onclick="newFromCal('${d}','${sl}','${v.id}')">${inner}</td>`;
+      }
+    });
+    h+='</tr>'})});
+  document.getElementById('caltb').innerHTML=h+'</tbody>';
+}
+
+// New from calendar click
+function newFromCal(date,slot,venueId){
+  if(!can('input'))return;
+  const v=VN.find(x=>x.id===venueId);
+  document.getElementById('mot').textContent='新建接待 · '+fD(date)+' · '+v.n+' · '+(SS[slot]||slot);
+  let fm=`<div class="fr c2"><div class="fl"><label>日期</label><input type="date" id="nf-date" value="${date}"></div><div class="fl"><label>时段</label><select id="nf-slot">${['午餐','下午茶','晚餐','上午会议','下午会议','全天','下午场','晚场'].map(s=>`<option${s===slot?' selected':''}>${s}</option>`).join('')}</select></div></div>`;
+  fm+=`<div class="fr c2"><div class="fl"><label>类别</label><select id="nf-type"><option>餐饮</option><option>茶苑</option><option>活动/会议</option><option>KTV</option></select></div><div class="fl"><label>人数 *</label><input type="number" id="nf-pax" placeholder="8" min="1"></div></div>`;
+  fm+=`<div class="fl" style="margin-bottom:10px"><label>场地</label><div style="font-size:13px;font-weight:500;padding:8px 0">${v.n}<span style="color:var(--ink3);font-weight:400;margin-left:6px">${v.c}</span></div></div>`;
+  fm+=`<div class="fr c2"><div class="fl"><label>客户姓名 *</label><div class="ac-wrap"><input type="text" id="nf-client" placeholder="输入匹配会员" oninput="nfCI()" autocomplete="off"><div class="ac-list" id="nf-acl"></div></div></div><div class="fl"><label>电话</label><input type="tel" id="nf-phone" placeholder="选填"></div></div>`;
+  fm+=`<div class="fr c3"><div class="fl"><label>会员类型</label><select id="nf-mem"><option value="散客">散客</option><option value="逢吉">逢吉（储值）</option><option value="承吉">承吉 88折</option><option value="享吉">享吉 75折</option><option value="开吉">开吉 6折</option><option value="云集旧会员">云集旧</option><option value="股东">股东 6折</option></select></div><div class="fl"><label>新/老客</label><select id="nf-ret"><option>老客户</option><option>新客户</option></select></div><div class="fl"><label>定金</label><input type="number" id="nf-dep" placeholder="0" min="0"></div></div>`;
+  fm+=`<div class="fr c2"><div class="fl"><label>介绍人/商务</label><input type="text" id="nf-bd" placeholder="选填"></div><div class="fl"><label>行为</label><select id="nf-act">${PA.map(a=>`<option>${a}</option>`).join('')}</select></div></div>`;
+  fm+=`<div class="fl" style="margin-bottom:10px"><label>备注</label><textarea id="nf-note" placeholder="忌口、布置..."></textarea></div>`;
+  document.getElementById('mob').innerHTML=fm;
+  document.getElementById('moa').innerHTML=`<button class="btn" onclick="clM()">取消</button><button class="btn btn-p" style="width:auto;flex:2" onclick="saveFromCal('${venueId}')">保存</button>`;
+  document.getElementById('mo').classList.add('on');
+  linkedMem=null;
+}
+function nfCI(){
+  const q=document.getElementById('nf-client').value.trim().toLowerCase(),list=document.getElementById('nf-acl');
+  if(q.length<1){list.classList.remove('on');linkedMem=null;return}
+  const matches=M.filter(m=>m.name.toLowerCase().includes(q)||m.phone.includes(q));
+  list.innerHTML=matches.length?matches.map(m=>`<div class="ac-item" onclick="nfSelMem(${m.id})"><strong>${m.name}</strong> <span style="font-size:11px;color:var(--ink3)">${m.level}${m.bal>0?' · '+Y+m.bal.toLocaleString():''}${m.phone?' · '+m.phone:''}</span></div>`).join(''):`<div class="ac-item" style="color:var(--ink3)">无匹配（散客）</div>`;
+  list.classList.add('on');
+}
+function nfSelMem(id){
+  const m=M.find(x=>x.id===id);if(!m)return;linkedMem=m;
+  document.getElementById('nf-client').value=m.name;
+  document.getElementById('nf-phone').value=m.phone||'';
+  document.getElementById('nf-mem').value=m.level==='散客'?'散客':m.level;
+  document.getElementById('nf-acl').classList.remove('on');
+}
+function saveFromCal(venueId){
+  const cl=document.getElementById('nf-client').value.trim();
+  const pax=parseInt(document.getElementById('nf-pax').value)||0;
+  if(!cl||pax<1){alert('请填写客户姓名和人数');return}
+  const dep=parseFloat(document.getElementById('nf-dep').value)||0;
+  const mem=document.getElementById('nf-mem').value;
+  const disc=DISC[mem]||1;
+  const ty=document.getElementById('nf-type').value;
+  const est=(ty==='餐饮'||ty==='茶苑')?Math.round(pax*RACK*disc):0;
+  O.unshift({id:nid++,date:document.getElementById('nf-date').value,slot:document.getElementById('nf-slot').value,type:ty,venues:[venueId],client:cl,phone:document.getElementById('nf-phone').value.trim(),member:mem,ret:document.getElementById('nf-ret').value,pax,bd:document.getElementById('nf-bd').value.trim(),dep,note:document.getElementById('nf-note').value.trim(),action:document.getElementById('nf-act').value,status:dep>0?'已确认':'待确认',est,memId:linkedMem?linkedMem.id:null});
+  clM();rCal();rAll();
+}
+
+// ══════ ORDER (merged) ══════
+function rOrd(){
+  const t=td();
+  document.getElementById('ord-bar').innerHTML=['全部','待确认','已确认','已收款','已入账','已取消'].map(s=>`<button class="fc${oFilt===(s==='全部'?'':s)?' on':''}" onclick="oF('s','${s==='全部'?'':s}')">${s}</button>`).join('')+'<div style="width:1px;background:var(--border);flex-shrink:0;margin:0 2px"></div>'+['餐饮','茶苑','活动/会议','KTV'].map(t=>`<button class="fc${oType===t?' on':''}" onclick="oF('t','${t}')">${t}</button>`).join('');
+  let l=[...O];if(oFilt)l=l.filter(o=>o.status===oFilt);if(oType)l=l.filter(o=>o.type===oType);
+  l.sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  document.getElementById('ord-list').innerHTML=l.length?l.map(o=>{
+    const act=o.action||dA(o.slot,o.type);
+    let actions='';
+    if(can('input')&&o.status==='待确认')actions=`<div class="bi-a"><button class="btn btn-s btn-g" onclick="cfmO(${o.id});event.stopPropagation()">确认</button><button class="btn btn-s btn-r" onclick="cnlO(${o.id});event.stopPropagation()">取消</button></div>`;
+    else if(can('input')&&o.status==='已确认')actions=`<div class="bi-a"><button class="btn btn-s btn-b" onclick="billO(${o.id});event.stopPropagation()">结账收款</button><button class="btn btn-s btn-r" onclick="cnlO(${o.id});event.stopPropagation()">取消</button></div>`;
+    return`<div class="bi ${sC[o.status]||'s-pending'}" onclick="showOrder(${o.id})"><div class="bi-top"><div class="bi-cl">${o.client}</div><div class="bi-tg"><span class="tag ${sT[o.status]}">${o.status}</span><span class="tag t-ty">${o.type}</span>${o.member&&o.member!=='散客'?`<span class="tag t-m">${o.member}</span>`:''}</div></div><div class="bi-m">${fD(o.date)} · ${o.slot} · ${gvn(o.venues)}<br>${o.pax}人 · ${act}${o.bd?' · 商务:'+o.bd:''}${o.dep>0?' · 定金'+o.dep.toLocaleString()+'元':''}</div>${o.note?`<div class="bi-n">${o.note}</div>`:''}${actions}</div>`;
+  }).join(''):'<div class="empty">暂无订单</div>';
+}
+function oF(k,v){if(k==='s')oFilt=v;if(k==='t')oType=oType===v?'':v;rOrd()}
+
+// Show order detail modal
+function showOrder(id){
+  const o=O.find(x=>x.id===id);if(!o)return;
+  const act=o.action||dA(o.slot,o.type);
+  const mem=o.memId?M.find(m=>m.id===o.memId):null;
+  const bill=B.find(b=>b.oid===o.id);
+  document.getElementById('mot').textContent=fD(o.date)+' · '+o.client;
+  let h=`<div style="display:flex;justify-content:space-between;margin-bottom:12px"><span style="font-size:16px;font-weight:700">${o.client}</span><span class="tag ${sT[o.status]}">${o.status}</span></div>`;
+  h+=`<div style="font-size:13px;color:var(--ink2);line-height:2">${o.slot} · ${gvn(o.venues)}<br>${o.pax}人 · ${act} · ${o.member}${o.ret==='新客'?'<br>新客户':''}${o.phone?'<br>'+maskPh(o.phone):''}${o.bd?'<br>商务：'+o.bd:''}${o.dep>0?'<br>定金：'+o.dep.toLocaleString()+'元':''}${o.est>0?'<br>预估：'+Y+o.est.toLocaleString():''}</div>`;
+  if(mem)h+=`<div style="margin-top:8px;padding:8px;background:var(--purple-bg);border-radius:6px;font-size:12px;color:var(--purple)">会员：${mem.name}（${mem.level}）${mem.bal>0?' · 余额'+Y+mem.bal.toLocaleString():''}${mem.debt>0?' · <span style="color:var(--red)">旧债'+Y+mem.debt.toLocaleString()+'</span>':''}</div>`;
+  if(o.note)h+=`<div style="margin-top:8px;padding:8px;background:var(--bg2);border-radius:6px;font-size:12px;color:var(--ink2)">${o.note}</div>`;
+  if(bill){
+    h+=`<div style="margin-top:12px;padding:10px;border:1px solid var(--border);border-radius:var(--radius)"><div style="font-size:11px;color:var(--ink3);margin-bottom:6px">结账信息</div><div style="font-size:13px;color:var(--ink2);line-height:1.8">消费：${Y}${bill.total.toLocaleString()} · 实收：${Y}${bill.paid.toLocaleString()} · ${bill.method}${bill.food>0?'<br>食材成本：'+Y+bill.food.toLocaleString():''}${bill.butler?'<br>管家：'+bill.butler:''}${bill.server?'<br>服务员：'+bill.server:''}${bill.chef?'<br>厨师：'+bill.chef:''}${bill.stars>0?'<br>满意度：'+starH(bill.stars):''}${bill.bdComm>0?'<br>商务提成：'+Y+bill.bdComm.toLocaleString():''}</div></div>`;
+  }
+  document.getElementById('mob').innerHTML=h;
+  // Actions based on status
+  let btns='';
+  if(can('input')){
+    if(o.status==='待确认')btns=`<button class="btn btn-g" onclick="cfmO(${o.id});clM()">确认</button><button class="btn" onclick="editO(${o.id})">编辑</button><button class="btn btn-r" onclick="clM();cnlO(${o.id})">取消</button>`;
+    else if(o.status==='已确认')btns=`<button class="btn btn-b" onclick="clM();billO(${o.id})">结账收款</button><button class="btn" onclick="editO(${o.id})">编辑</button><button class="btn btn-r" onclick="clM();cnlO(${o.id})">取消</button>`;
+    else btns=`<button class="btn" onclick="clM()">关闭</button>`;
+  } else btns=`<button class="btn" onclick="clM()">关闭</button>`;
+  document.getElementById('moa').innerHTML=btns;
+  document.getElementById('mo').classList.add('on');
+}
+
+// Order actions
+function cfmO(id){const o=O.find(x=>x.id===id);if(o&&can('input')){o.status='已确认';rAll();rOrd();rCal()}}
+function cnlO(id){
+  const o=O.find(x=>x.id===id);if(!o)return;
+  document.getElementById('mot').textContent='取消订单';
+  document.getElementById('mob').innerHTML=`<div style="margin-bottom:10px">确认取消 <strong>${o.client}</strong>？<br><span style="font-size:12px;color:var(--ink3)">${fD(o.date)} ${o.slot}</span></div><div class="fl"><label>取消原因</label><input type="text" id="cn-note" placeholder="客户临时有事"></div>`;
+  document.getElementById('moa').innerHTML=`<button class="btn" onclick="clM()">返回</button><button class="btn btn-r" onclick="doCnl(${id})">确认取消</button>`;
+  document.getElementById('mo').classList.add('on');
+}
+function doCnl(id){const o=O.find(x=>x.id===id);if(o){o.status='已取消';o.cnote=document.getElementById('cn-note').value.trim()||'无';clM();rAll();rOrd();rCal()}}
+
+// Edit order
+function editO(id){
+  const o=O.find(x=>x.id===id);if(!o)return;
+  document.getElementById('mot').textContent='编辑订单 · '+o.client;
+  let fm=`<div class="fr c2"><div class="fl"><label>日期</label><input type="date" id="ed-date" value="${o.date}"></div><div class="fl"><label>时段</label><select id="ed-slot">${['午餐','下午茶','晚餐','上午会议','下午会议','全天','下午场','晚场'].map(s=>`<option${s===o.slot?' selected':''}>${s}</option>`).join('')}</select></div></div>`;
+  fm+=`<div class="fr c2"><div class="fl"><label>类别</label><select id="ed-type">${['餐饮','茶苑','活动/会议','KTV'].map(t=>`<option${t===o.type?' selected':''}>${t}</option>`).join('')}</select></div><div class="fl"><label>人数</label><input type="number" id="ed-pax" value="${o.pax}" min="1"></div></div>`;
+  fm+=`<div class="fr c2"><div class="fl"><label>客户姓名</label><input type="text" id="ed-client" value="${o.client}"></div><div class="fl"><label>电话</label><input type="tel" id="ed-phone" value="${o.phone||''}"></div></div>`;
+  fm+=`<div class="fr c3"><div class="fl"><label>会员类型</label><select id="ed-mem">${['散客','逢吉','承吉','享吉','开吉','云集旧会员','股东'].map(m=>`<option${m===o.member?' selected':''}>${m}</option>`).join('')}</select></div><div class="fl"><label>介绍人/商务</label><input type="text" id="ed-bd" value="${o.bd||''}"></div><div class="fl"><label>定金</label><input type="number" id="ed-dep" value="${o.dep||0}" min="0"></div></div>`;
+  fm+=`<div class="fl" style="margin-bottom:10px"><label>备注</label><textarea id="ed-note">${o.note||''}</textarea></div>`;
+  document.getElementById('mob').innerHTML=fm;
+  document.getElementById('moa').innerHTML=`<button class="btn" onclick="showOrder(${id})">取消</button><button class="btn btn-p" style="width:auto;flex:2" onclick="saveEdit(${id})">保存修改</button>`;
+}
+function saveEdit(id){
+  const o=O.find(x=>x.id===id);if(!o)return;
+  o.date=document.getElementById('ed-date').value;o.slot=document.getElementById('ed-slot').value;
+  o.type=document.getElementById('ed-type').value;o.pax=parseInt(document.getElementById('ed-pax').value)||o.pax;
+  o.client=document.getElementById('ed-client').value.trim()||o.client;o.phone=document.getElementById('ed-phone').value.trim();
+  o.member=document.getElementById('ed-mem').value;o.bd=document.getElementById('ed-bd').value.trim();
+  o.dep=parseFloat(document.getElementById('ed-dep').value)||0;o.note=document.getElementById('ed-note').value.trim();
+  const disc=DISC[o.member]||1;o.est=(o.type==='餐饮'||o.type==='茶苑')?Math.round(o.pax*RACK*disc):0;
+  clM();rAll();rOrd();rCal();
+}
+
+// Billing
+function billO(id){
+  if(!can('input'))return;const o=O.find(x=>x.id===id);if(!o)return;
+  const mem=o.memId?M.find(m=>m.id===o.memId):null;
+  const disc=DISC[o.member]||1;const memDisc=mem&&mem.disc?mem.disc:disc;const est=o.est||Math.round(o.pax*RACK*memDisc);
+  billStar=0;
+  document.getElementById('mot').textContent='结账收款 · '+o.client;
+  let fm=`<div style="font-size:12px;color:var(--ink3);margin-bottom:10px">${fD(o.date)} · ${o.slot} · ${o.pax}人${o.member&&o.member!=='散客'?' · '+o.member:''}${mem&&mem.bal>0?' · 储值余额'+Y+mem.bal.toLocaleString():''}</div>`;
+  fm+=`<div class="fr c3"><div class="fl"><label>消费金额 *</label><input type="number" id="bl-a" value="${est}" min="0"></div><div class="fl"><label>折扣</label><input type="number" id="bl-disc" value="${Math.round(memDisc*100)}" min="1" max="100" step="1"><div style="font-size:10px;color:var(--ink3);margin-top:2px">输入百分比，如88=88折</div></div><div class="fl"><label>食材成本</label><input type="number" id="bl-f" value="${Math.round(est*FR)}" min="0"></div></div>`;
+  fm+=`<div class="fr c2"><div class="fl"><label>实收金额 *</label><input type="number" id="bl-p" value="${est-(o.dep||0)}" min="0">${o.dep>0?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">已收定金 ${o.dep.toLocaleString()} 元</div>`:''}</div><div class="fl"><label>收款方式</label><select id="bl-m"><option>微信</option><option>现金</option>${mem&&mem.bal>0?'<option selected>储值扣减</option>':'<option>储值扣减</option>'}<option>挂账</option><option>转账</option></select></div></div>`;
+  fm+=`<div class="fst">服务记录</div>`;
+  fm+=`<div class="fr c4"><div class="fl"><label>管家</label><input type="text" id="bl-butler" placeholder="选填"></div><div class="fl"><label>服务员</label><input type="text" id="bl-server" placeholder="选填"></div><div class="fl"><label>厨师</label><input type="text" id="bl-chef" placeholder="选填"></div><div class="fl"><label>满意度</label><div class="stars" id="bl-stars"></div></div></div>`;
+  fm+=`<div style="font-size:11px;color:var(--ink3);margin-top:4px">收款后→已收款→财务确认→已入账</div>`;
+  document.getElementById('mob').innerHTML=fm;
+  document.getElementById('moa').innerHTML=`<button class="btn" onclick="clM()">取消</button><button class="btn btn-b" style="flex:2" onclick="doBill(${id})">确认收款</button>`;
+  document.getElementById('mo').classList.add('on');
+  renderBillStars();
+}
+function renderBillStars(){document.getElementById('bl-stars').innerHTML=[1,2,3,4,5].map(i=>`<div class="star${billStar>=i?' on':''}" onclick="billStar=${i};renderBillStars()">${billStar>=i?'\u2605':'\u2606'}</div>`).join('')}
+function doBill(id){
+  const o=O.find(x=>x.id===id);if(!o)return;
+  const a=parseFloat(document.getElementById('bl-a').value)||0,f=parseFloat(document.getElementById('bl-f').value)||0,p=parseFloat(document.getElementById('bl-p').value)||0,m=document.getElementById('bl-m').value;
+  const totalPaid=p+(o.dep||0);
+  let bdComm=0;
+  if(o.bd&&o.type==='餐饮'&&m!=='储值扣减'){const mem=o.memId?M.find(x=>x.id===o.memId):null;const isOld=mem&&mem.level==='云集旧会员';if(!isOld)bdComm=Math.round(totalPaid*.08)}
+  if(m==='储值扣减'&&o.memId){const mem=M.find(x=>x.id===o.memId);if(mem)mem.bal=Math.max(0,mem.bal-totalPaid)}
+  if(o.memId){const mem=M.find(x=>x.id===o.memId);if(mem){mem.spent+=totalPaid;mem.vis++}}
+  B.push({id:nbid++,oid:o.id,date:o.date,client:o.client,pax:o.pax,member:o.member,food:f,total:a,paid:totalPaid,method:m,confirmed:0,memId:o.memId,bdName:o.bd||'',bdComm,butler:document.getElementById('bl-butler').value.trim(),server:document.getElementById('bl-server').value.trim(),chef:document.getElementById('bl-chef').value.trim(),stars:billStar});
+  o.status='已收款';clM();rAll();rOrd();rCal();
+}
+
+function clM(){document.getElementById('mo').classList.remove('on')}
+document.getElementById('mo').addEventListener('click',e=>{if(e.target===e.currentTarget)clM()});
+
+// ══════ FINANCE ══════
+function rFin(){
+  const mo=td().slice(0,7);
+  const iPend=B.filter(b=>!b.confirmed),iDone=B.filter(b=>b.confirmed&&b.date.startsWith(mo)),iT=iDone.reduce((s,b)=>s+b.paid,0);
+  document.getElementById('fic').textContent=iPend.length?` (${iPend.length})`:'';
+  document.getElementById('fit').textContent=iT?` ${Y}${fM(iT)}`:'';
+  document.getElementById('fip').innerHTML=iPend.length?iPend.map(b=>`<div class="ei sib"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><div><span style="font-weight:500">${b.client}</span><span style="font-size:12px;color:var(--ink3);margin-left:6px">${b.method}</span></div><span style="font-weight:700;color:var(--purple)">${Y}${b.paid.toLocaleString()}</span></div><div style="font-size:12px;color:var(--ink2)">${fD(b.date)} · ${b.member}</div>${can('input')?`<div class="bi-a"><button class="btn btn-s btn-g" onclick="cfmI(${b.id})">确认入账</button></div>`:''}</div>`).join(''):'<div class="empty" style="padding:12px">全部已入账</div>';
+  document.getElementById('fid').innerHTML=iDone.length?iDone.slice(0,10).map(b=>`<div style="padding:6px 0;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;font-size:13px"><div>${b.client}<span style="color:var(--ink3);margin-left:6px">${b.method}</span></div><span style="font-weight:700;color:var(--green)">${Y}${b.paid.toLocaleString()}</span></div>`).join(''):'<div class="empty" style="padding:12px">暂无</div>';
+  // Expenses
+  const ePend=E.filter(e=>e.status==='待审批'),eDone=E.filter(e=>e.status==='已审批'&&e.date.startsWith(mo)),eT=eDone.reduce((s,e)=>s+e.amt,0);
+  document.getElementById('fec').textContent=ePend.length?` (${ePend.length})`:'';
+  document.getElementById('fet').textContent=eT?` ${Y}${fM(eT)}`:'';
+  if(can('input')){document.getElementById('fef').innerHTML=`<div style="font-size:11px;color:var(--ink3);margin-bottom:8px">${role==='approve'?'可直接审批':'提交后需老板审批'}</div><div class="fr c2"><div class="fl"><label>日期</label><input type="date" id="ed2" value="${td()}"></div><div class="fl"><label>类别</label><select id="ec2">${EC.map(c=>'<option>'+c+'</option>').join('')}</select></div></div><div class="fr c2"><div class="fl"><label>金额 *</label><input type="number" id="ea2" placeholder="0" min="0"></div><div class="fl"><label>供应商</label><input type="text" id="es2" placeholder="东方鲁瑞"></div></div><div class="fl" style="margin-bottom:8px"><label>备注</label><input type="text" id="en2" placeholder="用途"></div><button class="btn btn-p" onclick="subE()">提交支出</button>`}else{document.getElementById('fef').innerHTML='<div class="empty" style="padding:12px">无权限</div>'}
+  document.getElementById('fep').innerHTML=ePend.length?ePend.map(e=>`<div class="ei sp"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><div><span style="font-weight:500">${e.cat}</span><span style="font-size:12px;color:var(--ink3);margin-left:6px">${fD(e.date)}</span></div><span style="font-weight:700;color:var(--amber)">${Y}${e.amt.toLocaleString()}</span></div><div style="font-size:12px;color:var(--ink2)">${e.sup?e.sup+' · ':''}${e.note||''}</div>${role==='approve'?`<div class="bi-a"><button class="btn btn-s btn-g" onclick="apE(${e.id})">批准</button><button class="btn btn-s btn-r" onclick="rejE(${e.id})">驳回</button></div>`:''}</div>`).join(''):'<div class="empty" style="padding:12px">暂无</div>';
+  document.getElementById('fed').innerHTML=eDone.length?eDone.map(e=>`<div style="padding:6px 0;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;font-size:13px"><div>${e.cat}<span style="color:var(--ink3);margin-left:6px">${e.sup||''}</span></div><span style="font-weight:700;color:var(--green)">${Y}${e.amt.toLocaleString()}</span></div>`).join(''):'<div class="empty" style="padding:12px">暂无</div>';
+}
+function cfmI(id){const b=B.find(x=>x.id===id);if(b&&can('input')){b.confirmed=1;const o=O.find(x=>x.id===b.oid);if(o)o.status='已入账';rFin();rNS()}}
+function subE(){const a=parseFloat(document.getElementById('ea2').value)||0;if(!a){alert('请填写金额');return}E.push({id:neid++,date:document.getElementById('ed2').value,cat:document.getElementById('ec2').value,amt:a,sup:document.getElementById('es2').value.trim(),note:document.getElementById('en2').value.trim(),by:role==='approve'?'老板':'财务',status:'待审批',who:''});document.getElementById('ea2').value='';document.getElementById('es2').value='';document.getElementById('en2').value='';rFin();rNS()}
+function apE(id){const e=E.find(x=>x.id===id);if(e){e.status='已审批';e.who='老板';rFin();rNS()}}
+function rejE(id){const e=E.find(x=>x.id===id);if(e){e.status='已驳回';rFin();rNS()}}
+
+// ══════ MEMBER ══════
+function smf(f,el){mFilt=f;document.querySelectorAll('#p-mem .fc').forEach(c=>c.classList.remove('on'));el.classList.add('on');rMem()}
+function rMem(){
+  const q=(document.getElementById('mq').value||'').trim().toLowerCase();
+  let l=M;if(mFilt)l=l.filter(m=>m.level===mFilt);if(q)l=l.filter(m=>m.name.toLowerCase().includes(q)||m.phone.includes(q));
+  document.getElementById('mem-stats').innerHTML=`<div class="mets" style="margin-bottom:0"><div class="met"><div class="ml">会员总数</div><div class="mv">${M.length}</div></div><div class="met"><div class="ml">储值余额</div><div class="mv blue">${Y}${fM(M.reduce((s,m)=>s+m.bal,0))}</div></div></div>`;
+  const co={'承吉':'var(--green)','享吉':'var(--amber)','逢吉':'var(--blue)','开吉':'var(--purple)','云集旧会员':'var(--red)','散客':'var(--ink3)'};
+  const bg={'承吉':'var(--green-bg)','享吉':'var(--amber-bg)','逢吉':'var(--blue-bg)','开吉':'var(--purple-bg)','云集旧会员':'var(--red-bg)','散客':'var(--bg2)'};
+  document.getElementById('mem-list').innerHTML=l.length?l.map(m=>{const c=co[m.level]||'var(--ink3)',g=bg[m.level]||'var(--bg2)';const soon=m.exp&&((new Date(m.exp)-new Date())/864e5)<30;return`<div class="mc" onclick="shMem(${m.id})"><div style="display:flex;gap:12px;align-items:center"><div class="mav" style="background:${g};color:${c}">${m.name.slice(0,1)}</div><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="font-weight:500">${m.name}</span><span class="tag" style="background:${g};color:${c}">${m.level}</span>${soon?'<span class="tag" style="background:var(--red-bg);color:var(--red)">即将到期</span>':''}</div><div style="font-size:12px;color:var(--ink3)">${m.bal>0?'余额'+Y+m.bal.toLocaleString()+' · ':''}消费${Y}${fM(m.spent)} · ${m.vis}次${m.debt>0?' · <span style="color:var(--red)">旧债'+Y+m.debt.toLocaleString()+'</span>':''}</div></div></div></div>`}).join(''):'<div class="empty">暂无</div>';
+}
+function showMemForm(eid){
+  const m=eid?M.find(x=>x.id===eid):null;
+  document.getElementById('mot').textContent=m?'编辑会员':'新建会员';
+  document.getElementById('mob').innerHTML=`<div class="fr c2"><div class="fl"><label>姓名 *</label><input type="text" id="mm-n" value="${m?m.name:''}"></div><div class="fl"><label>电话</label><input type="text" id="mm-p" value="${m?m.phone:''}"></div></div><div class="fr c3"><div class="fl"><label>等级</label><select id="mm-l">${['散客','逢吉','承吉','享吉','开吉','云集旧会员','股东'].map(l=>`<option${m&&m.level===l?' selected':''}>${l}</option>`).join('')}</select></div><div class="fl"><label>默认折扣(%)</label><input type="number" id="mm-disc" value="${m&&m.disc?Math.round(m.disc*100):100}" min="1" max="100"><div style="font-size:10px;color:var(--ink3);margin-top:2px">如88=88折</div></div><div class="fl"><label>年费到期</label><input type="date" id="mm-e" value="${m?m.exp:''}"></div></div><div class="fr c2"><div class="fl"><label>储值余额</label><input type="number" id="mm-b" value="${m?m.bal:0}" min="0"></div><div class="fl"><label>旧云集余额</label><input type="number" id="mm-d" value="${m?m.debt:0}" min="0"></div></div><div class="fl" style="margin-bottom:8px"><label>备注</label><input type="text" id="mm-nt" value="${m?m.note:''}"></div>`;
+  document.getElementById('moa').innerHTML=`<button class="btn" onclick="clM()">取消</button><button class="btn btn-pu" style="flex:2" onclick="saveMem(${eid||0})">${m?'保存':'创建'}</button>`;
+  document.getElementById('mo').classList.add('on');
+}
+function saveMem(eid){
+  const name=document.getElementById('mm-n').value.trim();if(!name){alert('请填写姓名');return}
+  const d={name,phone:document.getElementById('mm-p').value.trim(),level:document.getElementById('mm-l').value,disc:(parseFloat(document.getElementById('mm-disc').value)||100)/100,exp:document.getElementById('mm-e').value,bal:parseFloat(document.getElementById('mm-b').value)||0,debt:parseFloat(document.getElementById('mm-d').value)||0,note:document.getElementById('mm-nt').value.trim()};
+  if(eid){const m=M.find(x=>x.id===eid);if(m)Object.assign(m,d)}else M.push({id:nmid++,...d,spent:0,vis:0});
+  clM();rMem();
+}
+function shMem(id){
+  const m=M.find(x=>x.id===id);if(!m)return;
+  document.getElementById('mot').textContent=m.name;
+  const rc=O.filter(o=>o.memId===m.id).slice(0,8);
+  const rb=B.filter(b=>b.memId===m.id).slice(0,5);
+  let h=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-size:18px;font-weight:700">${m.name}</span><span class="tag t-m">${m.level}</span>${can('input')?`<button class="btn btn-s" onclick="clM();showMemForm(${m.id})" style="margin-left:auto">编辑</button>`:''}</div>`;
+  h+=`<div style="font-size:13px;color:var(--ink2);line-height:2">${maskPh(m.phone)||''}${m.bal>0?'<br>储值：'+Y+m.bal.toLocaleString():''}${m.exp?'<br>年费到期：'+m.exp:''}${m.debt>0?'<br><span style="color:var(--red)">旧债：'+Y+m.debt.toLocaleString()+'</span>':''}<br>消费：${Y}${m.spent.toLocaleString()} · ${m.vis}次</div>`;
+  if(m.note)h+=`<div style="margin-top:8px;padding:8px;background:var(--bg2);border-radius:6px;font-size:12px;color:var(--ink2)">${m.note}</div>`;
+  if(rc.length){h+=`<div style="font-size:11px;font-weight:500;color:var(--ink3);margin:14px 0 6px">预定记录</div>`;rc.forEach(o=>{h+=`<div style="font-size:12px;color:var(--ink2);padding:4px 0;border-bottom:1px solid var(--border2)">${fD(o.date)} · ${o.slot} · ${o.pax}人 · <span class="tag ${sT[o.status]}" style="font-size:9px">${o.status}</span></div>`})}
+  if(rb.length){h+=`<div style="font-size:11px;font-weight:500;color:var(--ink3);margin:14px 0 6px">消费记录</div>`;rb.forEach(b=>{h+=`<div style="font-size:12px;color:var(--ink2);padding:4px 0;border-bottom:1px solid var(--border2)">${fD(b.date)} · ${b.method} · ${Y}${b.paid.toLocaleString()}${b.stars>0?' · '+starH(b.stars,11):''}</div>`})}
+  document.getElementById('mob').innerHTML=h;
+  document.getElementById('moa').innerHTML=`<button class="btn" onclick="clM()">关闭</button>`;
+  document.getElementById('mo').classList.add('on');
+}
+
+// ══════ BUSINESS ══════
+function rBiz(){
+  const mo=td().slice(0,7),mbl=B.filter(b=>b.date.startsWith(mo)&&b.bdName);
+  const bdMap={};mbl.forEach(b=>{if(!bdMap[b.bdName])bdMap[b.bdName]={rev:0,comm:0,cnt:0,cls:new Set()};bdMap[b.bdName].rev+=b.paid;bdMap[b.bdName].comm+=b.bdComm;bdMap[b.bdName].cnt++;bdMap[b.bdName].cls.add(b.client)});
+  const bdR=Object.entries(bdMap).sort((a,b)=>b[1].rev-a[1].rev);
+  const tc=bdR.reduce((s,[,d])=>s+d.comm,0);
+  document.getElementById('biz-sum').innerHTML=`<div class="mets" style="margin-bottom:0"><div class="met"><div class="ml">本月商务带来收入</div><div class="mv green">${Y}${fM(bdR.reduce((s,[,d])=>s+d.rev,0))}</div></div><div class="met"><div class="ml">应付提成总额</div><div class="mv amber">${Y}${fM(tc)}</div><div class="ms">餐饮8% · 储值/年费10%</div></div></div>`;
+  document.getElementById('biz-rank').innerHTML=bdR.length?bdR.map(([n,d],i)=>`<div class="dri"><div><span style="color:var(--ink3);margin-right:8px;font-weight:700">${i+1}</span><span style="font-weight:500">${n}</span><span style="font-size:12px;color:var(--ink3);margin-left:8px">${d.cnt}单 · ${d.cls.size}客户</span></div><div style="text-align:right"><div style="font-weight:700;color:var(--green)">${Y}${fM(d.rev)}</div><div style="font-size:11px;color:var(--amber)">提成 ${Y}${d.comm.toLocaleString()}</div></div></div>`).join(''):'<div class="empty">本月暂无商务业绩</div>';
+}
+
+// ══════ DASHBOARD = Boss View ══════
+function rDash(){
+  const t=td(),mo=t.slice(0,7);
+  const mbl=B.filter(b=>b.confirmed&&b.date.startsWith(mo)),me=E.filter(e=>e.status==='已审批'&&e.date.startsWith(mo));
+  const rev=mbl.reduce((s,b)=>s+b.paid,0),food=mbl.reduce((s,b)=>s+b.food,0),expT=me.reduce((s,e)=>s+e.amt,0);
+  const fRate=rev>0?Math.round(food/rev*100):0,dp=parseInt(t.split('-')[2]);
+  const mo2=O.filter(o=>o.date.startsWith(mo)&&o.status!=='已取消');
+  const dd=new Set(mo2.filter(o=>o.type==='餐饮').map(o=>o.date)).size;
+  const avgT=dp>0?(mo2.filter(o=>o.type==='餐饮').length/dp).toFixed(1):'0';
+  const net=rev-expT;
+
+  document.getElementById('dash-met').innerHTML=`<div class="met"><div class="ml">本月收入（已入账）</div><div class="mv green">${Y}${fM(rev)}</div><div class="ms">目标 ${Y}45万</div></div><div class="met"><div class="ml">食材成本率</div><div class="mv ${fRate>40?'red':fRate>35?'amber':'green'}">${fRate}%</div><div class="ms">目标 ≤35%</div></div><div class="met"><div class="ml">日均桌数</div><div class="mv ${parseFloat(avgT)>=2?'green':'amber'}">${avgT}</div><div class="ms">保本需4桌</div></div><div class="met"><div class="ml">本月净利润</div><div class="mv ${net>0?'green':'red'}">${Y}${fM(net)}</div><div class="ms">收入-已审批支出</div></div>`;
+
+  const dr=mbl.filter(b=>{const o=O.find(x=>x.id===b.oid);return o&&o.type==='餐饮'}).reduce((s,b)=>s+b.paid,0);
+  document.getElementById('dash-rev').innerHTML=`<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:13px"><span>餐饮</span><span style="font-weight:500">${Y}${fM(dr)}</span></div><div class="db"><div class="dbf" style="width:${rev>0?Math.round(dr/rev*100):0}%;background:var(--green)"></div></div></div><div><div style="display:flex;justify-content:space-between;font-size:13px"><span>活动/KTV/其他</span><span style="font-weight:500">${Y}${fM(rev-dr)}</span></div><div class="db"><div class="dbf" style="width:${rev>0?Math.round((rev-dr)/rev*100):0}%;background:var(--amber)"></div></div></div>`;
+
+  const fe=me.filter(e=>e.cat==='食材采购').reduce((s,e)=>s+e.amt,0);
+  document.getElementById('dash-cost').innerHTML=`<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:13px"><span>食材采购</span><span style="font-weight:500">${Y}${fM(fe)}</span></div><div class="db"><div class="dbf" style="width:${expT>0?Math.round(fe/expT*100):50}%;background:var(--amber)"></div></div></div><div><div style="display:flex;justify-content:space-between;font-size:13px"><span>其他支出</span><span style="font-weight:500">${Y}${fM(expT-fe)}</span></div><div class="db"><div class="dbf" style="width:${expT>0?Math.round((expT-fe)/expT*100):50}%;background:var(--ink3)"></div></div></div><div style="font-size:11px;color:var(--ink3);margin-top:8px">总支出 ${Y}${fM(expT)}</div>`;
+
+  const bdMap={};mbl.forEach(b=>{if(b.bdName){if(!bdMap[b.bdName])bdMap[b.bdName]={r:0,c:0};bdMap[b.bdName].r+=b.paid;bdMap[b.bdName].c++}});
+  const bdR=Object.entries(bdMap).sort((a,b)=>b[1].r-a[1].r);
+  document.getElementById('dash-biz').innerHTML=bdR.length?bdR.map(([n,d],i)=>`<div class="dri"><div><span style="color:var(--ink3);margin-right:8px">${i+1}</span><span style="font-weight:500">${n}</span><span style="font-size:12px;color:var(--ink3);margin-left:6px">${d.c}单</span></div><span style="font-weight:700;color:var(--green)">${Y}${fM(d.r)}</span></div>`).join(''):'<div class="empty" style="padding:16px">暂无</div>';
+
+  const mp={承吉:{t:5,c:M.filter(m=>m.level==='承吉').length},享吉:{t:2,c:M.filter(m=>m.level==='享吉').length}};
+  document.getElementById('dash-mp').innerHTML=Object.entries(mp).map(([l,d])=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>${l}</span><span style="font-weight:500">${d.c}/${d.t}</span></div><div class="db"><div class="dbf" style="width:${Math.min(Math.round(d.c/d.t*100),100)}%;background:${d.c>=d.t?'var(--green)':'var(--amber)'}"></div></div></div>`).join('')+`<div style="font-size:11px;color:var(--ink3);margin-top:6px">目标：5承吉+2享吉=${Y}45万</div>`;
+}
+
+// Keyboard
+document.addEventListener('keydown',e=>{if(document.querySelector('.mo.on')){if(e.key==='Escape')clM()}});
+document.addEventListener('click',e=>{const acl=document.getElementById('nf-acl');if(acl&&!e.target.closest('.ac-wrap'))acl.classList.remove('on')});
+
+initData();calStart=td();
+</script>
+</body>
+</html>

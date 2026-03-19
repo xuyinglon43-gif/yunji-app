@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@14 yunji --typescript --tailwind --eslint --app --src-dir --no-import-alias --use-npm)",
+      "Bash(npm install:*)",
+      "Bash(shopt -s dotglob)",
+      "Bash(mv yunji/* .)",
+      "Bash(rm -rf yunji)",
+      "Bash(npx next:*)",
+      "Bash(npm run:*)",
+      "WebFetch(domain:43.156.160.76)",
+      "Bash(curl -s --max-time 10 http://43.156.160.76:3000)",
+      "Bash(curl -s http://43.156.160.76:3000)",
+      "Bash(curl:*)",
+      "Bash(gh auth:*)",
+      "Bash(gh repo:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh api:*)"
+    ]
+  }
+}
