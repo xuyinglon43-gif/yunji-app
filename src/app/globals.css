@@ -3,25 +3,112 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --bg: #F7F5F2;
+  --bg2: #EFECE8;
+  --bg3: #E8E4DF;
+  --white: #FFF;
+  --ink: #1C1A17;
+  --ink2: #5C5750;
+  --ink3: #9A9389;
+  --border: rgba(28,26,23,.12);
+  --border2: rgba(28,26,23,.08);
+  --green: #2D6A4F;
+  --green-bg: #EAF4EE;
+  --green-border: #A8D5B5;
+  --amber: #8B5E1A;
+  --amber-bg: #FDF3E3;
+  --amber-border: #E8C07A;
+  --red: #9B2335;
+  --red-bg: #FCEEF0;
+  --red-border: #E8A0AA;
+  --blue: #1B4F7A;
+  --blue-bg: #EBF3FA;
+  --blue-border: #A3C9E8;
+  --purple: #5B3A8C;
+  --purple-bg: #F3EDF9;
+  --purple-border: #C4A8E0;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+/* Schedule table styles */
+.cal-table {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.cal-table th,
+.cal-table td {
+  border: 1px solid var(--border);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cal-table th {
+  background: var(--bg2);
+  font-weight: 500;
+  padding: 4px 6px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.cal-table td {
+  padding: 0;
+}
+
+.cal-table .venue-cell {
+  background: var(--bg2);
+  font-weight: 600;
+  padding: 4px 8px;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  min-width: 60px;
+}
+
+.cal-table .slot-cell {
+  background: var(--bg);
+  font-size: 11px;
+  padding: 4px 6px;
+  position: sticky;
+  left: 60px;
+  z-index: 5;
+  min-width: 52px;
+}
+
+.cal-cell {
+  min-width: 56px;
+  height: 36px;
+  cursor: pointer;
+  transition: background 0.1s;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+.cal-cell:hover {
+  filter: brightness(0.95);
+}
+
+.cal-cell.today {
+  outline: 1.5px solid var(--blue);
+  outline-offset: -1.5px;
+}
+
+.cal-cell.weekend .day-header {
+  color: var(--red);
+}
+
+/* Scrollbar */
+.cal-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.cal-scroll::-webkit-scrollbar-thumb {
+  background: var(--ink3);
+  border-radius: 3px;
 }

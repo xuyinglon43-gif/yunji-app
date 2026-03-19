@@ -1,101 +1,60 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/lib/auth';
+import LoginScreen from '@/components/LoginScreen';
+import Navigation from '@/components/Navigation';
+import Schedule from '@/components/Schedule';
+import OrdersPage from '@/components/OrdersPage';
+import MembersPage from '@/components/MembersPage';
+import FinancePage from '@/components/FinancePage';
+import BusinessPage from '@/components/BusinessPage';
+import HomePage from '@/components/HomePage';
+import DashboardPage from '@/components/DashboardPage';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const { role, logout } = useAuth();
+  const [currentPage, setCurrentPage] = useState('');
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    if (role) {
+      setCurrentPage(role === 'approve' ? 'dashboard' : 'schedule');
+    }
+  }, [role]);
+
+  if (!role) return <LoginScreen />;
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'home': return <HomePage />;
+      case 'schedule': return <Schedule />;
+      case 'orders': return <OrdersPage />;
+      case 'finance': return <FinancePage />;
+      case 'members': return <MembersPage />;
+      case 'business': return <BusinessPage />;
+      case 'dashboard': return <DashboardPage />;
+      default: return <Schedule />;
+    }
+  };
+
+  return (
+    <div className="h-screen flex flex-col md:flex-row bg-[var(--bg)]">
+      <Navigation currentPage={currentPage} onNavigate={setCurrentPage} />
+
+      <header className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-[var(--border)]">
+        <div>
+          <h1 className="text-base font-bold">云吉合院</h1>
+          <p className="text-[10px] text-[var(--ink3)]">运营管理系统</p>
         </div>
+        <button onClick={logout}
+          className="text-[11px] px-3 py-1 rounded-full bg-[var(--bg)] text-[var(--ink3)] hover:text-[var(--red)]">
+          退出
+        </button>
+      </header>
+
+      <main className="flex-1 overflow-hidden pb-14 md:pb-0">
+        {renderPage()}
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
