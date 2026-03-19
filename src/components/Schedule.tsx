@@ -240,7 +240,7 @@ export default function Schedule() {
                   <th
                     key={ds}
                     className={`px-1 py-1 ${isToday ? 'bg-[var(--green-bg)]' : ''}`}
-                    style={{ minWidth: isCompact ? 40 : 72 }}
+                    style={{ minWidth: isCompact ? 52 : 80 }}
                   >
                     <div className={`text-[10px] ${isWeekend ? 'text-[var(--red)]' : ''}`}>
                       周{DAY_NAMES[dow]}
@@ -269,7 +269,6 @@ export default function Schedule() {
                   const ds = formatDate(d);
                   const isToday = ds === today;
                   const slotOrders = getVenueDateOrders(venue.id, ds);
-                  const hasAny = slotOrders.some((s) => s.order);
 
                   return (
                     <td
@@ -279,39 +278,30 @@ export default function Schedule() {
                       onMouseLeave={handleCellLeave}
                       onClick={(e) => handleCellClick(venue.id, ds, e)}
                     >
-                      {/* 5 color bands */}
-                      <div className="flex gap-px" style={{ height: isCompact ? 32 : 48 }}>
+                      {/* 5 horizontal color bands */}
+                      <div className="flex flex-col gap-px" style={{ minHeight: isCompact ? 40 : 56 }}>
                         {slotOrders.map(({ slot, order }) => {
                           const colors = order ? BAND_COLORS[order.status] : null;
                           return (
                             <div
                               key={slot}
-                              className="flex-1 rounded-sm overflow-hidden flex items-center justify-center"
+                              className="flex-1 rounded-sm overflow-hidden flex items-center"
                               style={
                                 colors
-                                  ? { backgroundColor: colors.bg, border: `1px solid ${colors.border}` }
-                                  : { backgroundColor: 'transparent' }
+                                  ? { backgroundColor: colors.bg, border: `1px solid ${colors.border}`, minHeight: isCompact ? 6 : 9 }
+                                  : { minHeight: isCompact ? 6 : 9 }
                               }
                             >
-                              {/* Show text only in 7-day view when has order */}
                               {!isCompact && order && (
-                                <div className="text-center leading-none px-px" style={{ color: BAND_TEXT_COLORS[order.status] }}>
-                                  <div className="text-[8px] font-medium truncate" style={{ maxWidth: 48 }}>
-                                    {order.client.slice(0, 2)}
-                                  </div>
-                                  <div className="text-[7px]">{order.pax}人</div>
+                                <div className="flex items-center gap-1 px-1 w-full" style={{ color: BAND_TEXT_COLORS[order.status] }}>
+                                  <span className="text-[9px] font-medium truncate">{order.client.slice(0, 3)}</span>
+                                  <span className="text-[8px]">{order.pax}人</span>
                                 </div>
                               )}
                             </div>
                           );
                         })}
                       </div>
-                      {/* Small dot indicator for compact views with any bookings */}
-                      {isCompact && hasAny && (
-                        <div className="flex justify-center mt-0.5">
-                          <div className="w-1 h-1 rounded-full bg-[var(--green)]" />
-                        </div>
-                      )}
                     </td>
                   );
                 })}
