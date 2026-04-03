@@ -5,7 +5,69 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { Bill, BusinessContact, BizSettlement } from '@/lib/types';
 
-type View = 'list' | 'detail';
+type View = 'list' | 'detail' | 'rules';
+
+// 提成规则类型
+interface CommissionRules {
+  mode: 'fixed' | 'tiered' | 'threshold';
+  fixedRate: number;               // 固定比例 (%)
+  threshold: number;               // 门槛金额（低于此金额不计提）
+  tiers: { min: number; max: number; rate: number }[]; // 阶梯
+  storedValueRate: number;         // 储值/年费提成比例 (%)
+  storedValueConsumptionRate: number; // 储值消费提成 (%)
+  settleCycle: 'monthly' | 'quarterly' | 'manual'; // 结算周期
+}
+
+const DEFAULT_RULES: CommissionRules = {
+  mode: 'threshold',
+  fixedRate: 8,
+  threshold: 700000,
+  tiers: [
+    { min: 0, max: 500000, rate: 5 },
+    { min: 500000, max: 1000000, rate: 8 },
+    { min: 1000000, max: Infinity, rate: 10 },
+  ],
+  storedValueRate: 10,
+  storedValueConsumptionRate: 0,
+  settleCycle: 'monthly',
+};
+
+function loadRules(): CommissionRules {
+  try {
+    const saved = localStorage.getItem('yunji_biz_commission_rules');
+    if (saved) return { ...DEFAULT_RULES, ...JSON.parse(saved) };
+  } catch { /* ignore */ }
+  return DEFAULT_RULES;
+}
+
+function saveRules(rules: CommissionRules) {
+  localStorage.setItem('yunji_biz_commission_rules', JSON.stringify(rules));
+}
+
+// 根据规则计算提成
+function calcCommission(revenue: number, rules: CommissionRules): number {
+  switch (rules.mode) {
+    case 'fixed':
+      return Math.round(revenue * rules.fixedRate / 100);
+    case 'threshold':
+      if (revenue < rules.threshold) return 0;
+      return Math.round(revenue * rules.fixedRate / 100);
+    case 'tiered': {
+      let commission = 0;
+      let remaining = revenue;
+      for (const tier of rules.tiers) {
+        if (remaining <= 0) break;
+        const tierRange = (tier.max === Infinity ? remaining : tier.max - tier.min);
+        const applicable = Math.min(remaining, tierRange);
+        commission += applicable * tier.rate / 100;
+        remaining -= applicable;
+      }
+      return Math.round(commission);
+    }
+    default:
+      return 0;
+  }
+}
 
 export default function BusinessPage() {
   const { can, roleLabel } = useAuth();
@@ -23,11 +85,19 @@ export default function BusinessPage() {
   const [settleNote, setSettleNote] = useState('');
   const [showSettle, setShowSettle] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [rules, setRules] = useState<CommissionRules>(DEFAULT_RULES);
+  const [periodFilter, setPeriodFilter] = useState<'month' | 'quarter' | 'all'>('month');
 
   const thisMonth = new Date().toISOString().slice(0, 7);
+  const thisQuarterStart = useMemo(() => {
+    const now = new Date();
+    const q = Math.floor(now.getMonth() / 3) * 3;
+    return `${now.getFullYear()}-${String(q + 1).padStart(2, '0')}-01`;
+  }, []);
+
+  useEffect(() => { setRules(loadRules()); }, []);
 
   const fetchData = async () => {
-    // This month bills
     const { data: mb } = await supabase
       .from('bills').select('*, orders(client, type, biz_name, date)')
       .gte('date', thisMonth + '-01').eq('confirmed', true).is('deleted_at', null);
@@ -37,18 +107,15 @@ export default function BusinessPage() {
     };
     setBills((mb || []).map(mapBill) as typeof bills);
 
-    // All time bills (for cumulative)
     const { data: ab } = await supabase
       .from('bills').select('*, orders(client, type, biz_name, date)')
       .eq('confirmed', true).is('deleted_at', null);
     setAllBills((ab || []).map(mapBill) as typeof bills);
 
-    // Contacts
     const { data: c } = await supabase
       .from('business_contacts').select('*').is('deleted_at', null).order('name');
     setContacts(c || []);
 
-    // Settlements
     const { data: s } = await supabase
       .from('biz_settlements').select('*').order('settled_at', { ascending: false });
     setSettlements(s || []);
@@ -57,7 +124,13 @@ export default function BusinessPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
 
-  // Aggregate helper
+  // 根据筛选期间过滤账单
+  const periodBills = useMemo(() => {
+    if (periodFilter === 'all') return allBills;
+    if (periodFilter === 'quarter') return allBills.filter((b) => b.date >= thisQuarterStart);
+    return bills;
+  }, [periodFilter, bills, allBills, thisQuarterStart]);
+
   const aggregate = (billList: typeof bills) => {
     const map = new Map<string, { orders: number; clients: Set<string>; revenue: number; commission: number }>();
     for (const b of billList) {
@@ -70,41 +143,54 @@ export default function BusinessPage() {
     return map;
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const monthStats = useMemo(() => aggregate(bills), [bills]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const periodStats = useMemo(() => aggregate(periodBills), [periodBills]);
   const allTimeStats = useMemo(() => aggregate(allBills), [allBills]);
 
-  const totalMonthRevenue = useMemo(() => Array.from(monthStats.values()).reduce((s, v) => s + v.revenue, 0), [monthStats]);
-  const totalMonthCommission = useMemo(() => Array.from(monthStats.values()).reduce((s, v) => s + v.commission, 0), [monthStats]);
-  const totalAllRevenue = useMemo(() => Array.from(allTimeStats.values()).reduce((s, v) => s + v.revenue, 0), [allTimeStats]);
-  const totalAllCommission = useMemo(() => Array.from(allTimeStats.values()).reduce((s, v) => s + v.commission, 0), [allTimeStats]);
+  const totalPeriodRevenue = useMemo(() => {
+    let sum = 0;
+    periodStats.forEach((v) => { sum += v.revenue; });
+    return sum;
+  }, [periodStats]);
+  const totalPeriodCommission = useMemo(() => {
+    // 使用规则重新计算
+    let sum = 0;
+    periodStats.forEach((v) => { sum += calcCommission(v.revenue, rules); });
+    return sum;
+  }, [periodStats, rules]);
+  const totalAllRevenue = useMemo(() => {
+    let sum = 0;
+    allTimeStats.forEach((v) => { sum += v.revenue; });
+    return sum;
+  }, [allTimeStats]);
   const totalSettled = useMemo(() => settlements.reduce((s, v) => s + v.amount, 0), [settlements]);
 
-  // All biz names (from contacts + any name appearing in bills)
   const ranking = useMemo(() => {
     const names = new Set<string>();
     contacts.forEach((c) => names.add(c.name));
+    periodStats.forEach((_, k) => names.add(k));
     allTimeStats.forEach((_, k) => names.add(k));
     return Array.from(names).map((name) => {
-      const ms = monthStats.get(name);
+      const ps = periodStats.get(name);
       const as_ = allTimeStats.get(name);
       const contact = contacts.find((c) => c.name === name);
       const settled = settlements.filter((s) => s.biz_name === name).reduce((sum, s) => sum + s.amount, 0);
+      const periodRevenue = ps?.revenue || 0;
+      const periodCommission = calcCommission(periodRevenue, rules);
       return {
         name,
         contact,
-        monthRevenue: ms?.revenue || 0,
-        monthCommission: ms?.commission || 0,
-        monthOrders: ms?.orders || 0,
+        periodRevenue,
+        periodCommission,
+        periodOrders: ps?.orders || 0,
         allRevenue: as_?.revenue || 0,
         allCommission: as_?.commission || 0,
         allOrders: as_?.orders || 0,
         settled,
         unsettled: (as_?.commission || 0) - settled,
+        reachedThreshold: rules.mode !== 'threshold' || periodRevenue >= rules.threshold,
       };
-    }).sort((a, b) => b.monthRevenue - a.monthRevenue);
-  }, [monthStats, allTimeStats, contacts, settlements]);
+    }).sort((a, b) => b.periodRevenue - a.periodRevenue);
+  }, [periodStats, allTimeStats, contacts, settlements, rules]);
 
   // --- Contact CRUD ---
   const openCreateContact = () => {
@@ -144,11 +230,7 @@ export default function BusinessPage() {
   };
 
   // --- Settlement ---
-  const openSettle = () => {
-    setSettleAmount('');
-    setSettleNote('');
-    setShowSettle(true);
-  };
+  const openSettle = () => { setSettleAmount(''); setSettleNote(''); setShowSettle(true); };
 
   const doSettle = async () => {
     if (!selectedContact) return;
@@ -168,7 +250,6 @@ export default function BusinessPage() {
     fetchData();
   };
 
-  // --- Detail view ---
   const openDetail = (name: string) => {
     const c = contacts.find((ct) => ct.name === name) || null;
     setSelectedContact(c);
@@ -188,10 +269,123 @@ export default function BusinessPage() {
   const detailTotalCommission = detailBills.reduce((s, b) => s + b.biz_commission, 0);
   const detailTotalSettled = detailSettlements.reduce((s, v) => s + v.amount, 0);
 
-  const fmtTime = (ts: string) => {
-    if (!ts) return '';
-    return ts.split('T')[0];
-  };
+  const fmtTime = (ts: string) => ts ? ts.split('T')[0] : '';
+
+  const periodLabel = periodFilter === 'month' ? '本月' : periodFilter === 'quarter' ? '本季度' : '累计';
+
+  // =========== RULES VIEW ===========
+  if (view === 'rules') {
+    return (
+      <div className="flex flex-col h-full overflow-y-auto p-3 space-y-4">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setView('list')} className="text-xs text-[var(--blue)] hover:underline">← 返回列表</button>
+          <h2 className="font-bold text-base">提成规则配置</h2>
+        </div>
+
+        <div className="bg-white rounded-lg p-4 border border-[var(--border)] space-y-4">
+          {/* 计算模式 */}
+          <div>
+            <span className="text-[11px] font-medium text-[var(--ink2)] mb-2 block">计算模式</span>
+            <div className="flex gap-2">
+              {[
+                { id: 'fixed' as const, label: '固定比例', desc: '所有收入按固定比例计提' },
+                { id: 'threshold' as const, label: '门槛模式', desc: '月收入达标后才计提' },
+                { id: 'tiered' as const, label: '阶梯模式', desc: '按收入区间不同比例' },
+              ].map((m) => (
+                <button key={m.id} onClick={() => setRules((r) => ({ ...r, mode: m.id }))}
+                  className={`flex-1 p-3 rounded-lg border text-left transition
+                    ${rules.mode === m.id ? 'border-[var(--green)] bg-[var(--green-bg)]' : 'border-[var(--border)] hover:bg-[var(--bg)]'}`}>
+                  <div className="text-sm font-medium">{m.label}</div>
+                  <div className="text-[10px] text-[var(--ink3)] mt-0.5">{m.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 固定比例 */}
+          {(rules.mode === 'fixed' || rules.mode === 'threshold') && (
+            <label className="block">
+              <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">提成比例 (%)</span>
+              <input type="number" min="0" max="100" value={rules.fixedRate}
+                onChange={(e) => setRules((r) => ({ ...r, fixedRate: parseInt(e.target.value) || 0 }))}
+                className="w-full max-w-[200px] px-3 py-2 border border-[var(--border)] rounded-md text-sm" />
+            </label>
+          )}
+
+          {/* 门槛 */}
+          {rules.mode === 'threshold' && (
+            <label className="block">
+              <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">月收入门槛 (元)</span>
+              <input type="number" min="0" value={rules.threshold}
+                onChange={(e) => setRules((r) => ({ ...r, threshold: parseInt(e.target.value) || 0 }))}
+                className="w-full max-w-[200px] px-3 py-2 border border-[var(--border)] rounded-md text-sm" />
+              <span className="text-[10px] text-[var(--ink3)] mt-1 block">商务月收入低于此金额时不计提成</span>
+            </label>
+          )}
+
+          {/* 阶梯 */}
+          {rules.mode === 'tiered' && (
+            <div>
+              <span className="text-[11px] font-medium text-[var(--ink2)] mb-2 block">阶梯规则</span>
+              {rules.tiers.map((tier, idx) => (
+                <div key={idx} className="flex items-center gap-2 mb-2">
+                  <input type="number" min="0" value={tier.min} onChange={(e) => {
+                    const tiers = [...rules.tiers];
+                    tiers[idx] = { ...tiers[idx], min: parseInt(e.target.value) || 0 };
+                    setRules((r) => ({ ...r, tiers }));
+                  }} className="w-24 px-2 py-1 border border-[var(--border)] rounded text-xs" placeholder="起" />
+                  <span className="text-xs text-[var(--ink3)]">~</span>
+                  <input type="number" min="0" value={tier.max === Infinity ? '' : tier.max} onChange={(e) => {
+                    const tiers = [...rules.tiers];
+                    tiers[idx] = { ...tiers[idx], max: e.target.value ? parseInt(e.target.value) : Infinity };
+                    setRules((r) => ({ ...r, tiers }));
+                  }} className="w-24 px-2 py-1 border border-[var(--border)] rounded text-xs" placeholder="无上限" />
+                  <span className="text-xs">→</span>
+                  <input type="number" min="0" max="100" value={tier.rate} onChange={(e) => {
+                    const tiers = [...rules.tiers];
+                    tiers[idx] = { ...tiers[idx], rate: parseInt(e.target.value) || 0 };
+                    setRules((r) => ({ ...r, tiers }));
+                  }} className="w-16 px-2 py-1 border border-[var(--border)] rounded text-xs" />
+                  <span className="text-xs">%</span>
+                  <button onClick={() => {
+                    const tiers = rules.tiers.filter((_, i) => i !== idx);
+                    setRules((r) => ({ ...r, tiers }));
+                  }} className="text-[var(--red)] text-xs">删除</button>
+                </div>
+              ))}
+              <button onClick={() => {
+                const last = rules.tiers[rules.tiers.length - 1];
+                setRules((r) => ({ ...r, tiers: [...r.tiers, { min: last?.max === Infinity ? 0 : (last?.max || 0), max: Infinity, rate: 10 }] }));
+              }} className="text-[11px] text-[var(--green)] hover:underline">+ 添加阶梯</button>
+            </div>
+          )}
+
+          {/* 储值提成 */}
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">储值/年费提成 (%)</span>
+              <input type="number" min="0" max="100" value={rules.storedValueRate}
+                onChange={(e) => setRules((r) => ({ ...r, storedValueRate: parseInt(e.target.value) || 0 }))}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm" />
+            </label>
+            <label className="block">
+              <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">储值消费提成 (%)</span>
+              <input type="number" min="0" max="100" value={rules.storedValueConsumptionRate}
+                onChange={(e) => setRules((r) => ({ ...r, storedValueConsumptionRate: parseInt(e.target.value) || 0 }))}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm" />
+              <span className="text-[10px] text-[var(--ink3)] mt-1 block">客户用储值余额消费时的提成比例</span>
+            </label>
+          </div>
+
+          {/* 保存 */}
+          <button onClick={() => { saveRules(rules); setView('list'); }}
+            className="px-6 py-2.5 bg-[var(--green)] text-white text-sm rounded-lg hover:opacity-90 transition">
+            保存规则
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // =========== DETAIL VIEW ===========
   if (view === 'detail' && selectedContact) {
@@ -208,14 +402,12 @@ export default function BusinessPage() {
           )}
         </div>
 
-        {/* Contact info */}
         <div className="bg-white rounded-lg p-4 border border-[var(--border)] grid grid-cols-2 gap-2 text-sm">
           <div><span className="text-[var(--ink3)] text-xs">电话</span><p>{selectedContact.phone || '-'}</p></div>
           <div><span className="text-[var(--ink3)] text-xs">合作开始</span><p>{selectedContact.start_date || '-'}</p></div>
           {selectedContact.note && <div className="col-span-2"><span className="text-[var(--ink3)] text-xs">备注</span><p>{selectedContact.note}</p></div>}
         </div>
 
-        {/* Summary cards */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
             <div className="text-xs text-[var(--ink3)]">累计提成</div>
@@ -231,7 +423,6 @@ export default function BusinessPage() {
           </div>
         </div>
 
-        {/* Settle button */}
         {can('settle_commission') && (
           <button onClick={openSettle}
             className="px-4 py-2 bg-[var(--green)] text-white text-sm rounded-md hover:opacity-90 transition self-start">
@@ -239,7 +430,6 @@ export default function BusinessPage() {
           </button>
         )}
 
-        {/* Order details with commission breakdown */}
         <div className="bg-white rounded-lg border border-[var(--border)] overflow-hidden">
           <div className="px-3 py-2 bg-[var(--bg)] text-xs font-semibold text-[var(--ink2)]">
             关联订单明细（{detailBills.length}笔）
@@ -264,7 +454,6 @@ export default function BusinessPage() {
           ))}
         </div>
 
-        {/* Settlement history */}
         {detailSettlements.length > 0 && (
           <div className="bg-white rounded-lg border border-[var(--border)] overflow-hidden">
             <div className="px-3 py-2 bg-[var(--green-bg)] text-xs font-semibold text-[var(--green)]">结算记录</div>
@@ -280,7 +469,6 @@ export default function BusinessPage() {
           </div>
         )}
 
-        {/* Settle modal */}
         {showSettle && (
           <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40" onClick={() => setShowSettle(false)}>
             <div className="bg-white w-full max-w-[400px] rounded-t-xl md:rounded-xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -293,12 +481,12 @@ export default function BusinessPage() {
                 <label className="block">
                   <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">结算金额 *</span>
                   <input type="number" min="0" value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)}
-                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm" />
                 </label>
                 <label className="block">
                   <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">备注</span>
                   <input type="text" value={settleNote} onChange={(e) => setSettleNote(e.target.value)}
-                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm" />
                 </label>
               </div>
               <div className="flex gap-3 px-4 py-3 border-t border-[var(--border)]">
@@ -317,43 +505,70 @@ export default function BusinessPage() {
   // =========== LIST VIEW ===========
   return (
     <div className="flex flex-col h-full overflow-y-auto p-3 space-y-4">
-      {/* Summary cards — month + cumulative */}
+      {/* 期间筛选 + 操作按钮 */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-1">
+          {[
+            { id: 'month' as const, label: '本月' },
+            { id: 'quarter' as const, label: '本季度' },
+            { id: 'all' as const, label: '累计' },
+          ].map((p) => (
+            <button key={p.id} onClick={() => setPeriodFilter(p.id)}
+              className={`px-3 py-1.5 text-xs rounded-md border transition
+                ${periodFilter === p.id ? 'bg-[var(--green)] text-white border-[var(--green)]'
+                  : 'bg-white text-[var(--ink2)] border-[var(--border)] hover:bg-[var(--bg)]'}`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          {can('approve') && (
+            <button onClick={() => setView('rules')}
+              className="px-3 py-1.5 text-xs border border-[var(--border)] rounded-md text-[var(--ink2)] hover:bg-[var(--bg)] transition">
+              提成规则
+            </button>
+          )}
+          {can('edit') && (
+            <button onClick={openCreateContact}
+              className="px-3 py-1.5 text-xs bg-[var(--green)] text-white rounded-md hover:opacity-90">
+              + 新建商务
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--ink3)]">本月商务收入</div>
-          <div className="text-lg font-bold text-[var(--green)] mt-1">¥{totalMonthRevenue.toLocaleString()}</div>
+          <div className="text-[10px] text-[var(--ink3)]">{periodLabel}商务收入</div>
+          <div className="text-lg font-bold text-[var(--green)] mt-1">¥{totalPeriodRevenue.toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--ink3)]">本月应付提成</div>
-          <div className="text-lg font-bold text-[var(--amber)] mt-1">¥{totalMonthCommission.toLocaleString()}</div>
+          <div className="text-[10px] text-[var(--ink3)]">{periodLabel}应付提成</div>
+          <div className="text-lg font-bold text-[var(--amber)] mt-1">¥{totalPeriodCommission.toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
           <div className="text-[10px] text-[var(--ink3)]">累计商务收入</div>
           <div className="text-lg font-bold text-[var(--green)] mt-1">¥{totalAllRevenue.toLocaleString()}</div>
         </div>
         <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--ink3)]">累计提成 / 已结算</div>
-          <div className="text-lg font-bold mt-1">
-            <span className="text-[var(--amber)]">¥{totalAllCommission.toLocaleString()}</span>
-            <span className="text-xs text-[var(--green)] ml-1">/ ¥{totalSettled.toLocaleString()}</span>
-          </div>
+          <div className="text-[10px] text-[var(--ink3)]">累计已结算</div>
+          <div className="text-lg font-bold text-[var(--green)] mt-1">¥{totalSettled.toLocaleString()}</div>
         </div>
       </div>
 
-      {/* Search + Add */}
-      <div className="flex items-center gap-2">
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="搜索商务姓名或电话..."
-          className="flex-1 px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
-        {can('edit') && (
-          <button onClick={openCreateContact}
-            className="px-4 py-2 bg-[var(--green)] text-white text-sm rounded-md hover:opacity-90 whitespace-nowrap">
-            + 新建商务
-          </button>
-        )}
+      {/* 当前规则提示 */}
+      <div className="bg-[var(--bg)] rounded-lg px-3 py-2 text-[11px] text-[var(--ink3)]">
+        当前规则：{rules.mode === 'fixed' ? `固定 ${rules.fixedRate}%` : rules.mode === 'threshold' ? `月收入 ≥¥${rules.threshold.toLocaleString()} 后按 ${rules.fixedRate}% 计提` : '阶梯模式'}
+        {rules.storedValueConsumptionRate === 0 && ' · 储值消费不计提'}
       </div>
 
-      {/* Ranking / Contact list */}
+      {/* Search */}
+      <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+        placeholder="搜索商务姓名..."
+        className="px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
+
+      {/* Ranking */}
       <div className="bg-white rounded-lg border border-[var(--border)] overflow-hidden">
         <div className="px-3 py-2 bg-[var(--bg)] text-xs font-semibold text-[var(--ink2)]">商务业绩排行</div>
         {ranking.length === 0 && <div className="px-3 py-8 text-center text-xs text-[var(--ink3)]">暂无商务数据</div>}
@@ -375,9 +590,14 @@ export default function BusinessPage() {
                     {stat.contact.status === 'active' ? '活跃' : '暂停'}
                   </span>
                 )}
+                {!stat.reachedThreshold && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--amber-bg)] text-[var(--amber)]">
+                    未达标
+                  </span>
+                )}
               </div>
               <div className="text-xs text-[var(--ink3)]">
-                本月 {stat.monthOrders}单 ¥{stat.monthRevenue.toLocaleString()} · 累计 {stat.allOrders}单
+                {periodLabel} {stat.periodOrders}单 ¥{stat.periodRevenue.toLocaleString()} · 累计 {stat.allOrders}单
               </div>
             </div>
             <div className="text-right">
@@ -389,19 +609,6 @@ export default function BusinessPage() {
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Commission rules */}
-      <div className="bg-white rounded-lg p-4 border border-[var(--border)]">
-        <h3 className="text-xs font-semibold text-[var(--ink2)] mb-2">提成规则说明</h3>
-        <div className="text-xs text-[var(--ink3)] space-y-1">
-          <p>• 餐饮消费提成：<strong>8%</strong>（次月实收后结算）</p>
-          <p>• 储值/年费提成：<strong>10%</strong>（到账后一次性结算）</p>
-          <p>• 储值消费不再计提：客户用储值余额消费的部分不给商务提成</p>
-          <p>• 提成跟预定走：每笔预定填了谁的名字，这笔的提成就算谁的</p>
-          <p>• 散客自来：预定未填介绍人则无提成</p>
-          <p>• 旧云集客户：不计提成</p>
-        </div>
       </div>
 
       {/* Create/Edit Contact Modal */}
@@ -417,23 +624,23 @@ export default function BusinessPage() {
                 <label className="block">
                   <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">姓名 *</span>
                   <input type="text" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm" />
                 </label>
                 <label className="block">
                   <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">电话</span>
                   <input type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm" />
                 </label>
               </div>
               <label className="block">
                 <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">合作开始日期</span>
                 <input type="date" value={form.start_date} onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm" />
               </label>
               <label className="block">
                 <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">备注</span>
                 <textarea value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} rows={2}
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)] resize-none" />
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm resize-none" />
               </label>
             </div>
             <div className="flex gap-3 px-4 py-3 border-t border-[var(--border)]">

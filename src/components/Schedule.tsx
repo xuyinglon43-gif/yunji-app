@@ -41,21 +41,21 @@ function formatDate(date: Date): string {
 const DAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
 
 const BAND_COLORS: Record<string, { bg: string; border: string }> = {
-  '待确认': { bg: '#FAEEDA', border: '#FAC775' },
-  '已确认': { bg: '#E1F5EE', border: '#9FE1CB' },
-  '已收款': { bg: '#EEEDFE', border: '#CECBF6' },
-  '已入账': { bg: '#E6F1FB', border: '#B5D4F4' },
+  '待确认': { bg: '#FFF3CD', border: '#F0C040' },
+  '已确认': { bg: '#D4EDDA', border: '#5CB85C' },
+  '已收款': { bg: '#E8D5F5', border: '#9B59B6' },
+  '已入账': { bg: '#CCE5FF', border: '#2196F3' },
 };
 
 const BAND_TEXT_COLORS: Record<string, string> = {
-  '待确认': '#8B5E1A',
-  '已确认': '#2D6A4F',
-  '已收款': '#5B3A8C',
-  '已入账': '#1B4F7A',
+  '待确认': '#856404',
+  '已确认': '#155724',
+  '已收款': '#6F42C1',
+  '已入账': '#004085',
 };
 
 export default function Schedule() {
-  const [range, setRange] = useState(14);
+  const [range, setRange] = useState(3);
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -80,6 +80,7 @@ export default function Schedule() {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const today = formatDate(new Date());
+  const isExpanded = range <= 3;
   const isCompact = range > 7;
 
   const dates = useMemo(() => {
@@ -188,7 +189,7 @@ export default function Schedule() {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 p-3 bg-white border-b border-[var(--border)]">
         <div className="flex gap-1">
-          {[7, 14, 30, 60].map((r) => (
+          {[3, 7, 14, 30].map((r) => (
             <button
               key={r}
               onClick={() => setRange(r)}
@@ -240,18 +241,31 @@ export default function Schedule() {
                   <th
                     key={ds}
                     className={`px-1 py-1 ${isToday ? 'bg-[var(--green-bg)]' : ''}`}
-                    style={{ minWidth: isCompact ? 52 : 80 }}
+                    style={{ minWidth: isExpanded ? 200 : isCompact ? 52 : 80, width: isExpanded ? `${100 / range}%` : undefined }}
                   >
-                    <div className={`text-[10px] ${isWeekend ? 'text-[var(--red)]' : ''}`}>
-                      周{DAY_NAMES[dow]}
-                    </div>
-                    <div className={`text-xs font-semibold ${isWeekend ? 'text-[var(--red)]' : ''}`}>
-                      {d.getDate()}
-                    </div>
-                    {!isCompact && (
-                      <div className="text-[10px] text-[var(--ink3)]">
-                        {d.getMonth() + 1}月
-                      </div>
+                    {isExpanded ? (
+                      <>
+                        <div className={`text-xs font-semibold ${isWeekend ? 'text-[var(--red)]' : ''}`}>
+                          {ds === today ? '今天' : ds === formatDate(addDays(new Date(), 1)) ? '明天' : ds === formatDate(addDays(new Date(), 2)) ? '后天' : `${d.getMonth() + 1}/${d.getDate()}`}
+                        </div>
+                        <div className={`text-[10px] ${isWeekend ? 'text-[var(--red)]' : 'text-[var(--ink3)]'}`}>
+                          {d.getMonth() + 1}月{d.getDate()}日 周{DAY_NAMES[dow]}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className={`text-[10px] ${isWeekend ? 'text-[var(--red)]' : ''}`}>
+                          周{DAY_NAMES[dow]}
+                        </div>
+                        <div className={`text-xs font-semibold ${isWeekend ? 'text-[var(--red)]' : ''}`}>
+                          {d.getDate()}
+                        </div>
+                        {!isCompact && (
+                          <div className="text-[10px] text-[var(--ink3)]">
+                            {d.getMonth() + 1}月
+                          </div>
+                        )}
+                      </>
                     )}
                   </th>
                 );
@@ -273,35 +287,93 @@ export default function Schedule() {
                   return (
                     <td
                       key={ds}
-                      className={`p-0.5 cursor-pointer transition hover:bg-[var(--bg2)] ${isToday ? 'bg-[var(--green-bg)]/30' : ''}`}
-                      onMouseEnter={(e) => handleCellHover(venue.id, ds, e)}
-                      onMouseLeave={handleCellLeave}
-                      onClick={(e) => handleCellClick(venue.id, ds, e)}
+                      className={`p-0.5 cursor-pointer transition hover:bg-[var(--bg2)] ${isToday ? 'bg-[var(--green-bg)]/30' : ''} ${isExpanded ? 'align-top' : ''}`}
+                      onMouseEnter={(e) => !isExpanded && handleCellHover(venue.id, ds, e)}
+                      onMouseLeave={() => !isExpanded && handleCellLeave()}
+                      onClick={(e) => !isExpanded && handleCellClick(venue.id, ds, e)}
                     >
-                      {/* 5 horizontal color bands */}
-                      <div className="flex flex-col gap-px" style={{ minHeight: isCompact ? 40 : 56 }}>
-                        {slotOrders.map(({ slot, order }) => {
-                          const colors = order ? BAND_COLORS[order.status] : null;
-                          return (
-                            <div
-                              key={slot}
-                              className="flex-1 rounded-sm overflow-hidden flex items-center"
-                              style={
-                                colors
-                                  ? { backgroundColor: colors.bg, border: `1px solid ${colors.border}`, minHeight: isCompact ? 6 : 9 }
-                                  : { minHeight: isCompact ? 6 : 9 }
-                              }
-                            >
-                              {!isCompact && order && (
-                                <div className="flex items-center gap-1 px-1 w-full" style={{ color: BAND_TEXT_COLORS[order.status] }}>
-                                  <span className="text-[9px] font-medium truncate">{order.client.slice(0, 3)}</span>
-                                  <span className="text-[8px]">{order.pax}人</span>
+                      {isExpanded ? (
+                        /* 3天展开视图：每个时段独立卡片 */
+                        <div className="flex flex-col gap-1 p-1">
+                          {slotOrders.map(({ slot, order }) => {
+                            const colors = order ? BAND_COLORS[order.status] : null;
+                            if (!order) return null;
+                            return (
+                              <div
+                                key={slot}
+                                className="rounded-md px-2 py-1.5 cursor-pointer hover:opacity-80 transition"
+                                style={{
+                                  backgroundColor: colors!.bg,
+                                  border: `1.5px solid ${colors!.border}`,
+                                }}
+                                onClick={() => setSelectedOrderId(order.id)}
+                              >
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="text-sm font-semibold truncate" style={{ color: BAND_TEXT_COLORS[order.status] }}>
+                                    {order.client}
+                                  </span>
+                                  <span
+                                    className="text-[9px] px-1.5 py-0.5 rounded-full whitespace-nowrap font-medium"
+                                    style={{
+                                      backgroundColor: colors!.border + '30',
+                                      color: BAND_TEXT_COLORS[order.status],
+                                    }}
+                                  >
+                                    {order.status}
+                                  </span>
                                 </div>
-                              )}
+                                <div className="text-xs mt-0.5" style={{ color: BAND_TEXT_COLORS[order.status] }}>
+                                  {slot} · {order.pax}人 · {order.type}
+                                </div>
+                                {order.biz_name && (
+                                  <div className="text-[10px] mt-0.5 text-[var(--ink3)]">
+                                    商务：{order.biz_name}
+                                  </div>
+                                )}
+                                {order.note && (
+                                  <div className="text-[10px] mt-0.5 text-[var(--amber)] truncate">
+                                    {order.note}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {/* 空白时段点击新建 */}
+                          {slotOrders.every(({ order }) => !order) && (
+                            <div
+                              className="text-xs text-[var(--ink3)] text-center py-4 hover:text-[var(--green)] transition"
+                              onClick={() => setNewOrderInfo({ date: ds, slot: '午餐', venueId: venue.id })}
+                            >
+                              点击新建预定
                             </div>
-                          );
-                        })}
-                      </div>
+                          )}
+                        </div>
+                      ) : (
+                        /* 7/14/30天紧凑视图：色带模式 */
+                        <div className="flex flex-col gap-px" style={{ minHeight: isCompact ? 40 : 56 }}>
+                          {slotOrders.map(({ slot, order }) => {
+                            const colors = order ? BAND_COLORS[order.status] : null;
+                            return (
+                              <div
+                                key={slot}
+                                className="flex-1 rounded-sm overflow-hidden flex items-center"
+                                style={
+                                  colors
+                                    ? { backgroundColor: colors.bg, border: `1px solid ${colors.border}`, minHeight: isCompact ? 6 : 9 }
+                                    : { minHeight: isCompact ? 6 : 9 }
+                                }
+                              >
+                                {!isCompact && order && (
+                                  <div className="flex items-center gap-1 px-1 w-full" style={{ color: BAND_TEXT_COLORS[order.status] }}>
+                                    <span className="text-[9px] font-medium truncate">{order.client.slice(0, 3)}</span>
+                                    <span className="text-[8px]">{order.pax}人</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </td>
                   );
                 })}

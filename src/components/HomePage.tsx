@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { VENUES } from '@/lib/constants';
 import { useAuth } from '@/lib/auth';
-import { Order, Bill } from '@/lib/types';
+import { Order, Bill, Member } from '@/lib/types';
 
 function addDays(d: Date, n: number) {
   const r = new Date(d);
@@ -28,6 +28,7 @@ export default function HomePage() {
   const [pendingConfirm, setPendingConfirm] = useState<Order[]>([]);
   const [pendingBill, setPendingBill] = useState<Order[]>([]);
   const [recentFeedback, setRecentFeedback] = useState<(Bill & { order_client?: string })[]>([]);
+  const [todayMembers, setTodayMembers] = useState<Member[]>([]);
 
   const today = new Date();
 
@@ -65,6 +66,15 @@ export default function HomePage() {
           order_client: (b.orders as Record<string, string>)?.client || '',
         })) as (Bill & { order_client?: string })[]
       );
+
+      // 今日到访的会员信息（通过今日订单的 member_id 关联）
+      const todayOrdersList = (orders || []).filter((o: Order) => o.date === dates[0] && o.member_id);
+      const memberIds = todayOrdersList.map((o: Order) => o.member_id).filter(Boolean);
+      if (memberIds.length > 0) {
+        const { data: members } = await supabase
+          .from('members').select('*').in('id', memberIds);
+        setTodayMembers(members || []);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -80,8 +90,76 @@ export default function HomePage() {
     );
   }, [tomorrowOrders]);
 
+  // 今日数据看板
+  const todayOrders = dayOrders[0] || [];
+  const todayTableCount = todayOrders.length;
+  const todayPax = todayOrders.reduce((s, o) => s + o.pax, 0);
+  const todayPendingCount = pendingConfirm.length;
+
+  // 今日客户提醒
+  const todayAlerts = useMemo(() => {
+    const alerts: { order: Order; reasons: string[]; member?: Member }[] = [];
+    for (const o of todayOrders) {
+      const reasons: string[] = [];
+      if (o.member_level !== '散客') reasons.push(`${o.member_level}会员`);
+      if (o.pax >= 8) reasons.push(`大桌${o.pax}人`);
+      if (o.note && o.note.trim()) reasons.push(`备注: ${o.note}`);
+      const member = o.member_id ? todayMembers.find((m) => m.id === o.member_id) : undefined;
+      if (member && member.fee_expiry) {
+        const expiry = new Date(member.fee_expiry);
+        const diff = Math.round((expiry.getTime() - today.getTime()) / 86400000);
+        if (diff <= 30 && diff >= 0) reasons.push(`年费${diff}天后到期`);
+      }
+      if (reasons.length > 0) {
+        alerts.push({ order: o, reasons, member });
+      }
+    }
+    return alerts;
+  }, [todayOrders, todayMembers, today]);
+
   return (
     <div className="flex flex-col h-full overflow-y-auto p-3 space-y-4">
+      {/* 简洁数据看板 */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white rounded-lg p-3 border border-[var(--border)] text-center">
+          <div className="text-2xl font-bold text-[var(--green)]">{todayTableCount}</div>
+          <div className="text-[10px] text-[var(--ink3)] mt-0.5">今日预定桌数</div>
+        </div>
+        <div className="bg-white rounded-lg p-3 border border-[var(--border)] text-center">
+          <div className="text-2xl font-bold text-[var(--blue)]">{todayPax}</div>
+          <div className="text-[10px] text-[var(--ink3)] mt-0.5">预计到店人数</div>
+        </div>
+        <div className="bg-white rounded-lg p-3 border border-[var(--border)] text-center">
+          <div className={`text-2xl font-bold ${todayPendingCount > 0 ? 'text-[var(--amber)]' : 'text-[var(--green)]'}`}>{todayPendingCount}</div>
+          <div className="text-[10px] text-[var(--ink3)] mt-0.5">待确认订单</div>
+        </div>
+      </div>
+
+      {/* 今日客户提醒 */}
+      {todayAlerts.length > 0 && (
+        <div className="bg-[#CCE5FF] border border-[#2196F3] rounded-lg overflow-hidden">
+          <div className="px-3 py-2 text-xs font-semibold text-[#004085]">
+            今日客户提醒（{todayAlerts.length}项）
+          </div>
+          {todayAlerts.map(({ order: o, reasons }) => (
+            <div key={o.id} className="px-3 py-2 border-t border-[#2196F3]/20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-sm text-[#004085]">{o.client}</span>
+                  {o.member_level !== '散客' && (
+                    <span className="text-[9px] px-1 py-0.5 rounded bg-[var(--purple-bg)] text-[var(--purple)]">{o.member_level}</span>
+                  )}
+                </div>
+                <span className="text-xs text-[#004085]">{o.slot} · {venueNames(o.venues)}</span>
+              </div>
+              <div className="text-xs text-[#004085]/70 mt-0.5">
+                {o.pax}人 · {reasons.join(' · ')}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Alerts */}
       {(pendingConfirm.length > 0 || pendingBill.length > 0) && (
         <div className="flex gap-2 flex-wrap">

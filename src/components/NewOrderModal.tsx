@@ -42,7 +42,6 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
     client: '',
     phone: '',
     member_level: '散客',
-    is_returning: '',
     deposit: '',
     biz_name: '',
     action: '吃饭',
@@ -51,6 +50,7 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
 
   const [memberSuggestions, setMemberSuggestions] = useState<Member[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
+  const [bizSuggestions, setBizSuggestions] = useState<{ id: number; name: string; phone: string }[]>([]);
   const [saving, setSaving] = useState(false);
 
   // Member autocomplete
@@ -70,6 +70,26 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
     }, 200);
     return () => clearTimeout(timer);
   }, [form.client]);
+
+  // 商务联系人自动推荐
+  useEffect(() => {
+    const q = form.biz_name.trim();
+    if (q.length < 1) {
+      setBizSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from('business_contacts')
+        .select('id, name, phone')
+        .ilike('name', `%${q}%`)
+        .eq('status', 'active')
+        .is('deleted_at', null)
+        .limit(5);
+      if (data) setBizSuggestions(data);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [form.biz_name]);
 
   const selectMember = (m: Member) => {
     setForm((f) => ({
@@ -97,6 +117,23 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
     const discount = DEFAULT_DISCOUNTS[form.member_level] || 100;
     const estimated = Math.round(pax * 1000 * (discount / 100));
 
+    // 商务联系人：如果填了名字但在 business_contacts 表中不存在，自动新建
+    const bizName = form.biz_name.trim();
+    if (bizName) {
+      const { data: existingBiz } = await supabase
+        .from('business_contacts')
+        .select('id')
+        .eq('name', bizName)
+        .is('deleted_at', null)
+        .limit(1);
+      if (!existingBiz || existingBiz.length === 0) {
+        await supabase.from('business_contacts').insert({
+          name: bizName,
+          status: 'active',
+        });
+      }
+    }
+
     const { error } = await supabase.from('orders').insert({
       date: form.date,
       slot: form.slot,
@@ -105,7 +142,6 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
       client: form.client.trim(),
       phone: form.phone,
       member_level: form.member_level,
-      is_returning: form.is_returning || null,
       pax,
       action: form.action,
       deposit,
@@ -113,7 +149,7 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
       status: deposit > 0 ? '已确认' : '待确认',
       estimated,
       member_id: selectedMemberId,
-      biz_name: form.biz_name || null,
+      biz_name: bizName || null,
     });
 
     setSaving(false);
@@ -238,8 +274,8 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
             </label>
           </div>
 
-          {/* Row 5: Member level + Returning + Deposit */}
-          <div className="grid grid-cols-3 gap-3">
+          {/* Row 5: Member level + Deposit */}
+          <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">会员类型</span>
               <select
@@ -250,18 +286,6 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
                 {MEMBER_LEVELS.map((l) => (
                   <option key={l} value={l}>{l}</option>
                 ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">新/老客</span>
-              <select
-                value={form.is_returning}
-                onChange={(e) => update('is_returning', e.target.value)}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]"
-              >
-                <option value="">-</option>
-                <option value="新客">新客</option>
-                <option value="老客">老客</option>
               </select>
             </label>
             <label className="block">
@@ -279,16 +303,33 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
 
           {/* Row 6: Business + Action */}
           <div className="grid grid-cols-2 gap-3">
-            <label className="block">
+            <div className="relative">
               <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">介绍人/商务</span>
               <input
                 type="text"
                 value={form.biz_name}
                 onChange={(e) => update('biz_name', e.target.value)}
-                placeholder="商务介绍人"
+                placeholder="输入搜索或新增商务"
                 className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]"
               />
-            </label>
+              {bizSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-[var(--border)] rounded-md shadow-lg z-10 max-h-40 overflow-y-auto">
+                  {bizSuggestions.map((b) => (
+                    <button
+                      key={b.id}
+                      onClick={() => {
+                        setForm((f) => ({ ...f, biz_name: b.name }));
+                        setBizSuggestions([]);
+                      }}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--bg)] flex justify-between items-center"
+                    >
+                      <span className="font-medium">{b.name}</span>
+                      {b.phone && <span className="text-[10px] text-[var(--ink3)]">{b.phone}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <label className="block">
               <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">行为 *</span>
               <select

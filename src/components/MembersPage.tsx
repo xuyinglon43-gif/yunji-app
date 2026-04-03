@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { MEMBER_LEVELS, STATUS_COLORS } from '@/lib/constants';
+import { MEMBER_LEVELS, STATUS_COLORS, VENUES } from '@/lib/constants';
 import { useAuth } from '@/lib/auth';
 import { Member, DEFAULT_DISCOUNTS, Bill, Order } from '@/lib/types';
 import { softDelete, hardDelete, writeAuditLog } from '@/lib/audit';
 
-type ModalMode = null | 'create' | 'edit' | 'profile';
+type ModalMode = null | 'create' | 'edit' | 'profile' | 'recharge';
 
 export default function MembersPage() {
   const { role, can, roleLabel } = useAuth();
@@ -18,9 +18,9 @@ export default function MembersPage() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
-  // Profile data
   const [memberOrders, setMemberOrders] = useState<Order[]>([]);
   const [memberBills, setMemberBills] = useState<Bill[]>([]);
+  const [rechargeAmount, setRechargeAmount] = useState('');
 
   function emptyForm() {
     return { name: '', phone: '', level: '散客', discount: 100, balance: 0, fee_expiry: '', old_debt: 0, biz_name: '', note: '' };
@@ -41,10 +41,20 @@ export default function MembersPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchMembers(); }, [search, levelFilter]);
 
-  const openCreate = () => {
-    setForm(emptyForm());
-    setModalMode('create');
-  };
+  // 计算沉睡会员（60天未到访）
+  const dormantMembers = useMemo(() => {
+    const now = new Date();
+    const threshold = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    return members.filter((m) => {
+      if (m.level === '散客') return false;
+      if (!m.visits || m.visits === 0) return true;
+      // 用 updated_at 近似判断（精确判断需要查订单，这里用 member 的更新时间）
+      const lastActive = new Date(m.created_at);
+      return lastActive < threshold;
+    });
+  }, [members]);
+
+  const openCreate = () => { setForm(emptyForm()); setModalMode('create'); };
 
   const openEdit = (m: Member) => {
     setForm({
@@ -60,11 +70,30 @@ export default function MembersPage() {
     setSelectedMember(m);
     setModalMode('profile');
     const [ordersRes, billsRes] = await Promise.all([
-      supabase.from('orders').select('*').eq('member_id', m.id).order('date', { ascending: false }).limit(20),
-      supabase.from('bills').select('*').eq('member_id', m.id).order('date', { ascending: false }).limit(20),
+      supabase.from('orders').select('*').eq('member_id', m.id).is('deleted_at', null).order('date', { ascending: false }).limit(30),
+      supabase.from('bills').select('*').eq('member_id', m.id).is('deleted_at', null).order('date', { ascending: false }).limit(30),
     ]);
     setMemberOrders(ordersRes.data || []);
     setMemberBills(billsRes.data || []);
+  };
+
+  const openRecharge = (m: Member) => {
+    setSelectedMember(m);
+    setRechargeAmount('');
+    setModalMode('recharge');
+  };
+
+  const handleRecharge = async () => {
+    if (!selectedMember) return;
+    const amount = parseInt(rechargeAmount) || 0;
+    if (amount <= 0) return alert('请输入充值金额');
+    setSaving(true);
+    const newBalance = selectedMember.balance + amount;
+    await supabase.from('members').update({ balance: newBalance }).eq('id', selectedMember.id);
+    await writeAuditLog('members', selectedMember.id, '充值', `${selectedMember.name} 充值 ¥${amount}，余额 ¥${selectedMember.balance} → ¥${newBalance}`, roleLabel);
+    setSaving(false);
+    setModalMode(null);
+    fetchMembers();
   };
 
   const handleSave = async () => {
@@ -107,7 +136,6 @@ export default function MembersPage() {
   const updateForm = (key: string, value: string | number) => {
     setForm((f) => {
       const next = { ...f, [key]: value };
-      // Auto-set discount when level changes
       if (key === 'level' && typeof value === 'string') {
         next.discount = DEFAULT_DISCOUNTS[value] || 100;
       }
@@ -121,19 +149,43 @@ export default function MembersPage() {
     return phone.length >= 7 ? phone.slice(0, 3) + '****' + phone.slice(-4) : phone;
   };
 
-  // Whether current role can see financials
   const canSeeFinancials = role === 'approve' || role === 'finance' || role === 'service';
+
+  // 从订单数据推算档案增强信息
+  const lastVisitDate = memberOrders.length > 0 ? memberOrders[0].date : null;
+  const venueStats = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const o of memberOrders) {
+      if (o.venues) {
+        for (const v of o.venues) {
+          const name = VENUES.find((vn) => vn.id === v)?.name || v;
+          map[name] = (map[name] || 0) + 1;
+        }
+      }
+    }
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  }, [memberOrders]);
+
+  const slotStats = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const o of memberOrders) {
+      map[o.slot] = (map[o.slot] || 0) + 1;
+    }
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  }, [memberOrders]);
+
+  const avgSpend = memberBills.length > 0
+    ? Math.round(memberBills.reduce((s, b) => s + b.paid, 0) / memberBills.length)
+    : 0;
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-3 bg-white border-b border-[var(--border)] space-y-2">
         <div className="flex items-center gap-2">
-          <input
-            type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索姓名或电话..."
-            className="flex-1 px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]"
-          />
+            className="flex-1 px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
           {can('edit') && (
             <button onClick={openCreate}
               className="px-4 py-2 bg-[var(--green)] text-white text-sm rounded-md hover:opacity-90 transition whitespace-nowrap">
@@ -145,14 +197,29 @@ export default function MembersPage() {
           {['全部', ...MEMBER_LEVELS].map((l) => (
             <button key={l} onClick={() => setLevelFilter(l)}
               className={`px-2.5 py-1 text-xs rounded-full border transition
-                ${levelFilter === l
-                  ? 'bg-[var(--purple)] text-white border-[var(--purple)]'
+                ${levelFilter === l ? 'bg-[var(--purple)] text-white border-[var(--purple)]'
                   : 'bg-white text-[var(--ink3)] border-[var(--border)] hover:bg-[var(--bg)]'}`}>
               {l}
             </button>
           ))}
         </div>
       </div>
+
+      {/* 沉睡会员提醒 */}
+      {dormantMembers.length > 0 && (
+        <div className="mx-3 mt-3 p-3 bg-[#FFF3CD] border border-[#F0C040] rounded-lg">
+          <div className="text-xs font-semibold text-[#856404] mb-1">沉睡会员提醒 · {dormantMembers.length}位会员超过60天未到访</div>
+          <div className="flex flex-wrap gap-2">
+            {dormantMembers.slice(0, 10).map((m) => (
+              <button key={m.id} onClick={() => openProfile(m)}
+                className="text-[11px] px-2 py-1 bg-white border border-[#F0C040] rounded-full text-[#856404] hover:bg-[#FFF3CD] transition">
+                {m.name} · {m.level}
+              </button>
+            ))}
+            {dormantMembers.length > 10 && <span className="text-[11px] text-[#856404] py-1">等{dormantMembers.length}位...</span>}
+          </div>
+        </div>
+      )}
 
       {/* Member grid */}
       <div className="flex-1 overflow-y-auto p-3">
@@ -166,9 +233,11 @@ export default function MembersPage() {
               onClick={() => openProfile(m)}>
               <div className="flex items-center justify-between mb-1">
                 <span className="font-semibold text-sm">{m.name}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--purple-bg)] text-[var(--purple)] border border-[var(--purple-border)]">
-                  {m.level}
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--purple-bg)] text-[var(--purple)] border border-[var(--purple-border)]">
+                    {m.level}
+                  </span>
+                </div>
               </div>
               <div className="text-xs text-[var(--ink3)] space-y-0.5">
                 <div className="flex justify-between">
@@ -189,6 +258,15 @@ export default function MembersPage() {
                 {m.biz_name && <div className="text-[var(--amber)]">商务: {m.biz_name}</div>}
                 {m.note && <div className="truncate text-[var(--ink3)]">{m.note}</div>}
               </div>
+              {/* 快捷充值按钮 */}
+              {can('edit') && canSeeFinancials && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); openRecharge(m); }}
+                  className="mt-2 w-full text-[11px] py-1.5 rounded-md border border-[var(--green)] text-[var(--green)] hover:bg-[var(--green-bg)] transition"
+                >
+                  充值
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -263,14 +341,52 @@ export default function MembersPage() {
               <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg hover:opacity-90 transition disabled:opacity-50">
                 {saving ? '保存中...' : '保存'}
               </button>
-              <button onClick={() => setModalMode(null)} className="flex-1 py-2.5 text-sm border border-[var(--border)] rounded-lg hover:bg-[var(--bg)] transition">取消
-              </button>
+              <button onClick={() => setModalMode(null)} className="flex-1 py-2.5 text-sm border border-[var(--border)] rounded-lg hover:bg-[var(--bg)] transition">取消</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Profile Modal */}
+      {/* Recharge Modal */}
+      {modalMode === 'recharge' && selectedMember && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40" onClick={() => setModalMode(null)}>
+          <div className="bg-white w-full max-w-[360px] rounded-t-xl md:rounded-xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+              <h2 className="font-bold text-base">储值充值</h2>
+              <button onClick={() => setModalMode(null)} className="text-[var(--ink3)] text-lg">✕</button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="text-sm">
+                <span className="text-[var(--ink3)]">会员：</span>
+                <span className="font-medium">{selectedMember.name}</span>
+                <span className="ml-2 text-[var(--ink3)]">当前余额：</span>
+                <span className="font-medium">¥{selectedMember.balance.toLocaleString()}</span>
+              </div>
+              <label className="block">
+                <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">充值金额</span>
+                <input type="number" min="1" value={rechargeAmount}
+                  onChange={(e) => setRechargeAmount(e.target.value)}
+                  placeholder="请输入充值金额"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" autoFocus />
+              </label>
+              {rechargeAmount && parseInt(rechargeAmount) > 0 && (
+                <div className="text-xs text-[var(--ink3)]">
+                  充值后余额：¥{(selectedMember.balance + (parseInt(rechargeAmount) || 0)).toLocaleString()}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 px-4 py-3 border-t border-[var(--border)]">
+              <button onClick={handleRecharge} disabled={saving}
+                className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg hover:opacity-90 transition disabled:opacity-50">
+                {saving ? '处理中...' : '确认充值'}
+              </button>
+              <button onClick={() => setModalMode(null)} className="flex-1 py-2.5 text-sm border border-[var(--border)] rounded-lg hover:bg-[var(--bg)] transition">取消</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Modal - 增强版 */}
       {modalMode === 'profile' && selectedMember && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40" onClick={() => setModalMode(null)}>
           <div className="bg-white w-full max-w-[520px] max-h-[90vh] rounded-t-xl md:rounded-xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -291,34 +407,93 @@ export default function MembersPage() {
                 <button onClick={() => setModalMode(null)} className="text-[var(--ink3)] text-lg">✕</button>
               </div>
             </div>
-            <div className="p-4 space-y-3">
-              {/* Basic info */}
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div><span className="text-[var(--ink3)] text-xs">电话</span><p>{maskPhone(selectedMember.phone)}</p></div>
-                <div><span className="text-[var(--ink3)] text-xs">到访次数</span><p>{selectedMember.visits} 次</p></div>
+            <div className="p-4 space-y-4">
+              {/* 基本信息卡片 */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="bg-[var(--bg)] rounded-md p-2">
+                  <div className="text-[10px] text-[var(--ink3)]">电话</div>
+                  <div className="text-sm font-medium">{maskPhone(selectedMember.phone)}</div>
+                </div>
+                <div className="bg-[var(--bg)] rounded-md p-2">
+                  <div className="text-[10px] text-[var(--ink3)]">到访次数</div>
+                  <div className="text-sm font-medium">{selectedMember.visits} 次</div>
+                </div>
+                <div className="bg-[var(--bg)] rounded-md p-2">
+                  <div className="text-[10px] text-[var(--ink3)]">最近到访</div>
+                  <div className="text-sm font-medium">{lastVisitDate || '暂无'}</div>
+                </div>
                 {canSeeFinancials && (
                   <>
-                    <div><span className="text-[var(--ink3)] text-xs">折扣</span><p>{selectedMember.discount}%</p></div>
-                    <div><span className="text-[var(--ink3)] text-xs">储值余额</span><p>¥{selectedMember.balance.toLocaleString()}</p></div>
-                    <div><span className="text-[var(--ink3)] text-xs">累计消费</span><p>¥{selectedMember.total_spent.toLocaleString()}</p></div>
+                    <div className="bg-[var(--bg)] rounded-md p-2">
+                      <div className="text-[10px] text-[var(--ink3)]">折扣</div>
+                      <div className="text-sm font-medium">{selectedMember.discount}%</div>
+                    </div>
+                    <div className="bg-[var(--bg)] rounded-md p-2">
+                      <div className="text-[10px] text-[var(--ink3)]">储值余额</div>
+                      <div className="text-sm font-medium text-[var(--green)]">¥{selectedMember.balance.toLocaleString()}</div>
+                    </div>
+                    <div className="bg-[var(--bg)] rounded-md p-2">
+                      <div className="text-[10px] text-[var(--ink3)]">累计消费</div>
+                      <div className="text-sm font-medium">¥{selectedMember.total_spent.toLocaleString()}</div>
+                    </div>
+                    {memberBills.length > 0 && (
+                      <div className="bg-[var(--bg)] rounded-md p-2">
+                        <div className="text-[10px] text-[var(--ink3)]">场均消费</div>
+                        <div className="text-sm font-medium">¥{avgSpend.toLocaleString()}</div>
+                      </div>
+                    )}
                     {selectedMember.old_debt > 0 && (
-                      <div><span className="text-[var(--ink3)] text-xs">旧云集余额</span><p className="text-[var(--amber)]">¥{selectedMember.old_debt.toLocaleString()}</p></div>
+                      <div className="bg-[var(--amber-bg)] rounded-md p-2">
+                        <div className="text-[10px] text-[var(--amber)]">旧云集余额</div>
+                        <div className="text-sm font-medium text-[var(--amber)]">¥{selectedMember.old_debt.toLocaleString()}</div>
+                      </div>
                     )}
                     {selectedMember.fee_expiry && (
-                      <div><span className="text-[var(--ink3)] text-xs">年费到期</span><p>{selectedMember.fee_expiry}</p></div>
+                      <div className="bg-[var(--bg)] rounded-md p-2">
+                        <div className="text-[10px] text-[var(--ink3)]">年费到期</div>
+                        <div className="text-sm font-medium">{selectedMember.fee_expiry}</div>
+                      </div>
                     )}
                   </>
                 )}
               </div>
+
+              {/* 快捷充值按钮 */}
+              {can('edit') && canSeeFinancials && (
+                <button onClick={() => openRecharge(selectedMember)}
+                  className="w-full py-2 text-sm font-medium rounded-lg border-2 border-[var(--green)] text-[var(--green)] hover:bg-[var(--green-bg)] transition">
+                  储值充值
+                </button>
+              )}
+
+              {/* 消费偏好 */}
+              {(venueStats.length > 0 || slotStats.length > 0) && (
+                <div>
+                  <h3 className="text-xs font-semibold text-[var(--ink2)] mb-2">消费偏好</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {venueStats.map(([name, count]) => (
+                      <span key={name} className="text-[11px] px-2 py-1 bg-[var(--blue-bg)] text-[var(--blue)] rounded-full">
+                        {name} {count}次
+                      </span>
+                    ))}
+                    {slotStats.map(([name, count]) => (
+                      <span key={name} className="text-[11px] px-2 py-1 bg-[var(--green-bg)] text-[var(--green)] rounded-full">
+                        {name} {count}次
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {selectedMember.note && (
                 <div className="text-sm"><span className="text-[var(--ink3)] text-xs">备注</span><p>{selectedMember.note}</p></div>
               )}
 
-              {/* Recent orders */}
-              {canSeeFinancials && memberOrders.length > 0 && (
+              {/* 预定记录 */}
+              {memberOrders.length > 0 && (
                 <div>
-                  <h3 className="text-xs font-semibold text-[var(--ink2)] mb-2">预定记录</h3>
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                  <h3 className="text-xs font-semibold text-[var(--ink2)] mb-2">预定记录 ({memberOrders.length})</h3>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
                     {memberOrders.map((o) => (
                       <div key={o.id} className="flex justify-between text-xs p-2 bg-[var(--bg)] rounded">
                         <span>{o.date} {o.slot} {o.action}</span>
@@ -329,11 +504,11 @@ export default function MembersPage() {
                 </div>
               )}
 
-              {/* Recent bills */}
+              {/* 消费记录 */}
               {canSeeFinancials && memberBills.length > 0 && (
                 <div>
-                  <h3 className="text-xs font-semibold text-[var(--ink2)] mb-2">消费记录</h3>
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                  <h3 className="text-xs font-semibold text-[var(--ink2)] mb-2">消费记录 ({memberBills.length})</h3>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
                     {memberBills.map((b) => (
                       <div key={b.id} className="flex justify-between text-xs p-2 bg-[var(--bg)] rounded">
                         <span>{b.date} {b.method}</span>
