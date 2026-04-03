@@ -87,37 +87,38 @@ export default function MembersPage() {
     if (!selectedMember) return;
     const amount = parseInt(rechargeAmount) || 0;
     if (amount <= 0) return alert('请输入充值金额');
-    setSaving(true);
     const newBalance = selectedMember.balance + amount;
-    await supabase.from('members').update({ balance: newBalance }).eq('id', selectedMember.id);
-    await writeAuditLog('members', selectedMember.id, '充值', `${selectedMember.name} 充值 ¥${amount}，余额 ¥${selectedMember.balance} → ¥${newBalance}`, roleLabel);
-    setSaving(false);
+    const memberId = selectedMember.id;
+    const memberName = selectedMember.name;
+    const oldBalance = selectedMember.balance;
+    // 立即关闭弹窗，乐观更新余额
     setModalMode(null);
-    fetchMembers();
+    setMembers((prev) => prev.map((m) => m.id === memberId ? { ...m, balance: newBalance } : m));
+    // 后台写入
+    supabase.from('members').update({ balance: newBalance }).eq('id', memberId).then(() => fetchMembers());
+    writeAuditLog('members', memberId, '充值', `${memberName} 充值 ¥${amount}，余额 ¥${oldBalance} → ¥${newBalance}`, roleLabel);
   };
 
   const handleSave = async () => {
     if (!form.name.trim()) return alert('请填写姓名');
-    setSaving(true);
-    if (modalMode === 'create') {
-      await supabase.from('members').insert({
-        name: form.name.trim(), phone: form.phone, level: form.level,
-        discount: form.discount, balance: form.balance,
-        fee_expiry: form.fee_expiry || null, old_debt: form.old_debt, biz_name: form.biz_name || null, note: form.note,
-      });
-    } else if (modalMode === 'edit' && selectedMember) {
-      await supabase.from('members').update({
-        name: form.name.trim(), phone: form.phone, level: form.level,
-        discount: form.discount, balance: form.balance,
-        fee_expiry: form.fee_expiry || null, old_debt: form.old_debt, biz_name: form.biz_name || null, note: form.note,
-      }).eq('id', selectedMember.id);
-    }
-    const savedId = modalMode === 'edit' ? selectedMember?.id : null;
-    setSaving(false);
+    const isEdit = modalMode === 'edit';
+    const savedId = isEdit ? selectedMember?.id : null;
+    const memberData = {
+      name: form.name.trim(), phone: form.phone, level: form.level,
+      discount: form.discount, balance: form.balance,
+      fee_expiry: form.fee_expiry || null, old_debt: form.old_debt, biz_name: form.biz_name || null, note: form.note,
+    };
+    // 立即关闭弹窗，乐观更新本地列表
     setModalMode(null);
-    fetchMembers();
-    if (savedId) {
-      await writeAuditLog('members', savedId, '编辑', `编辑会员 ${form.name}`, roleLabel);
+    if (isEdit && selectedMember) {
+      setMembers((prev) => prev.map((m) => m.id === selectedMember.id ? { ...m, ...memberData } as Member : m));
+    }
+    // 后台写入数据库
+    if (isEdit && selectedMember) {
+      supabase.from('members').update(memberData).eq('id', selectedMember.id).then(() => fetchMembers());
+      writeAuditLog('members', savedId!, '编辑', `编辑会员 ${form.name}`, roleLabel);
+    } else {
+      supabase.from('members').insert(memberData).then(() => fetchMembers());
     }
   };
 

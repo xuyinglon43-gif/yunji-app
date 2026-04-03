@@ -207,19 +207,15 @@ export default function BusinessPage() {
 
   const saveContact = async () => {
     if (!form.name.trim()) return alert('请填写姓名');
-    setSaving(true);
-    if (editingContact) {
-      await supabase.from('business_contacts').update({
-        name: form.name.trim(), phone: form.phone, start_date: form.start_date || null, note: form.note,
-      }).eq('id', editingContact.id);
-    } else {
-      await supabase.from('business_contacts').insert({
-        name: form.name.trim(), phone: form.phone, start_date: form.start_date || null, note: form.note, status: 'active',
-      });
-    }
-    setSaving(false);
+    const contactData = { name: form.name.trim(), phone: form.phone, start_date: form.start_date || null, note: form.note };
+    // 立即关闭弹窗
     setShowForm(false);
-    fetchData();
+    // 后台写入
+    if (editingContact) {
+      supabase.from('business_contacts').update(contactData).eq('id', editingContact.id).then(() => fetchData());
+    } else {
+      supabase.from('business_contacts').insert({ ...contactData, status: 'active' }).then(() => fetchData());
+    }
   };
 
   const toggleStatus = async (c: BusinessContact) => {
@@ -236,18 +232,17 @@ export default function BusinessPage() {
     if (!selectedContact) return;
     const amount = parseInt(settleAmount) || 0;
     if (amount <= 0) return alert('请填写结算金额');
-    setSaving(true);
-    await supabase.from('biz_settlements').insert({
+    // 立即关闭弹窗
+    setShowSettle(false);
+    // 后台写入
+    supabase.from('biz_settlements').insert({
       biz_contact_id: selectedContact.id,
       biz_name: selectedContact.name,
       amount,
       settled_at: new Date().toISOString(),
       settled_by: roleLabel,
       note: settleNote,
-    });
-    setSaving(false);
-    setShowSettle(false);
-    fetchData();
+    }).then(() => fetchData());
   };
 
   const openDetail = (name: string) => {

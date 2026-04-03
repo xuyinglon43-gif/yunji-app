@@ -107,42 +107,46 @@ export default function FinancePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
 
-  const confirmBill = async (billId: number, orderId: number) => {
-    await supabase.from('bills').update({ confirmed: true, confirmed_at: new Date().toISOString() }).eq('id', billId);
-    await supabase.from('orders').update({ status: '已入账' }).eq('id', orderId);
-    fetchData();
+  const confirmBill = (billId: number, orderId: number) => {
+    // 乐观更新：立即从待入账列表移除
+    setPendingBills((prev) => prev.filter((b) => b.id !== billId));
+    // 后台写入
+    Promise.all([
+      supabase.from('bills').update({ confirmed: true, confirmed_at: new Date().toISOString() }).eq('id', billId),
+      supabase.from('orders').update({ status: '已入账' }).eq('id', orderId),
+    ]).then(() => fetchData());
   };
 
-  const approveExpense = async (id: number) => {
-    await supabase.from('expenses').update({ status: '已审批', approved_by: roleLabel }).eq('id', id);
-    fetchData();
+  const approveExpense = (id: number) => {
+    setPendingExpenses((prev) => prev.filter((e) => e.id !== id));
+    supabase.from('expenses').update({ status: '已审批', approved_by: roleLabel }).eq('id', id).then(() => fetchData());
   };
 
-  const rejectExpense = async (id: number) => {
-    await supabase.from('expenses').update({ status: '已驳回', approved_by: roleLabel }).eq('id', id);
-    fetchData();
+  const rejectExpense = (id: number) => {
+    setPendingExpenses((prev) => prev.filter((e) => e.id !== id));
+    supabase.from('expenses').update({ status: '已驳回', approved_by: roleLabel }).eq('id', id).then(() => fetchData());
   };
 
   const submitExpense = async () => {
     const amount = parseInt(expForm.amount) || 0;
     if (amount <= 0) return alert('请填写金额');
     if (!expForm.category) return alert('请选择类别');
-    setSaving(true);
-    await supabase.from('expenses').insert({
+    // 立即关闭弹窗
+    setShowExpenseForm(false);
+    setExpForm({ date: new Date().toISOString().split('T')[0], category: '食材采购', amount: '', supplier: '', note: '' });
+    const savedItems = [...expItems];
+    setExpItems([]);
+    // 后台写入
+    supabase.from('expenses').insert({
       date: expForm.date,
       category: expForm.category,
       amount,
       supplier: expForm.supplier || null,
       note: expForm.note || null,
-      items: expItems.length > 0 ? expItems : [],
+      items: savedItems.length > 0 ? savedItems : [],
       submitted_by: roleLabel,
       status: '待审批',
-    });
-    setSaving(false);
-    setShowExpenseForm(false);
-    setExpForm({ date: new Date().toISOString().split('T')[0], category: '食材采购', amount: '', supplier: '', note: '' });
-    setExpItems([]);
-    fetchData();
+    }).then(() => fetchData());
   };
 
   const addExpenseItem = () => {

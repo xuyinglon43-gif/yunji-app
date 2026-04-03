@@ -111,27 +111,23 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
     if (!form.client.trim()) return alert('请填写客户姓名');
     if (!form.pax || parseInt(form.pax) < 1) return alert('请填写人数');
 
-    setSaving(true);
     const deposit = parseInt(form.deposit) || 0;
     const pax = parseInt(form.pax);
     const discount = DEFAULT_DISCOUNTS[form.member_level] || 100;
     const estimated = Math.round(pax * 1000 * (discount / 100));
-
-    // 商务联系人：如果填了名字但在 business_contacts 表中不存在，自动新建
     const bizName = form.biz_name.trim();
+
+    // 立即关闭弹窗，后台写入
+    onSaved();
+
+    // 商务联系人自动新建（后台执行）
     if (bizName) {
-      const { data: existingBiz } = await supabase
-        .from('business_contacts')
-        .select('id')
-        .eq('name', bizName)
-        .is('deleted_at', null)
-        .limit(1);
-      if (!existingBiz || existingBiz.length === 0) {
-        await supabase.from('business_contacts').insert({
-          name: bizName,
-          status: 'active',
+      supabase.from('business_contacts').select('id').eq('name', bizName).is('deleted_at', null).limit(1)
+        .then(({ data }) => {
+          if (!data || data.length === 0) {
+            supabase.from('business_contacts').insert({ name: bizName, status: 'active' });
+          }
         });
-      }
     }
 
     const { error } = await supabase.from('orders').insert({
@@ -152,11 +148,8 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
       biz_name: bizName || null,
     });
 
-    setSaving(false);
     if (error) {
       alert('保存失败：' + error.message);
-    } else {
-      onSaved();
     }
   };
 
