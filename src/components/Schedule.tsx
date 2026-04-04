@@ -338,14 +338,12 @@ export default function Schedule() {
                               </div>
                             );
                           })}
-                          {/* 空白时段点击新建 */}
+                          {/* 空白格子点击可新建 */}
                           {slotOrders.every(({ order }) => !order) && (
                             <div
-                              className="text-xs text-[var(--ink3)] text-center py-4 hover:text-[var(--green)] transition"
+                              className="flex-1 min-h-[40px] cursor-pointer"
                               onClick={() => setNewOrderInfo({ date: ds, slot: '午餐', venueId: venue.id })}
-                            >
-                              点击新建预定
-                            </div>
+                            />
                           )}
                         </div>
                       ) : (
