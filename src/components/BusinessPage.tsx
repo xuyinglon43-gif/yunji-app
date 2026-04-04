@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
-import { Bill, BusinessContact, BizSettlement } from '@/lib/types';
+import { Bill, BusinessContact, BizSettlement, Order } from '@/lib/types';
 
 type View = 'list' | 'detail' | 'rules';
 
@@ -87,6 +87,8 @@ export default function BusinessPage() {
   const [saving, setSaving] = useState(false);
   const [rules, setRules] = useState<CommissionRules>(DEFAULT_RULES);
   const [periodFilter, setPeriodFilter] = useState<'month' | 'quarter' | 'all'>('month');
+  const [bizOrders, setBizOrders] = useState<Order[]>([]);
+  const [allBizOrders, setAllBizOrders] = useState<Order[]>([]);
 
   const thisMonth = new Date().toISOString().slice(0, 7);
   const thisQuarterStart = useMemo(() => {
@@ -119,6 +121,24 @@ export default function BusinessPage() {
     const { data: s } = await supabase
       .from('biz_settlements').select('*').order('settled_at', { ascending: false });
     setSettlements(s || []);
+
+    // 加载关联商务的订单（用于显示预定数）
+    const { data: mo } = await supabase
+      .from('orders').select('*')
+      .not('biz_name', 'is', null)
+      .neq('biz_name', '')
+      .is('deleted_at', null)
+      .neq('status', '已取消')
+      .gte('date', thisMonth + '-01');
+    setBizOrders(mo || []);
+
+    const { data: ao } = await supabase
+      .from('orders').select('*')
+      .not('biz_name', 'is', null)
+      .neq('biz_name', '')
+      .is('deleted_at', null)
+      .neq('status', '已取消');
+    setAllBizOrders(ao || []);
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -131,66 +151,100 @@ export default function BusinessPage() {
     return bills;
   }, [periodFilter, bills, allBills, thisQuarterStart]);
 
-  const aggregate = (billList: typeof bills) => {
-    const map = new Map<string, { orders: number; clients: Set<string>; revenue: number; commission: number }>();
+  // 根据筛选期间过滤订单
+  const periodOrders = useMemo(() => {
+    if (periodFilter === 'all') return allBizOrders;
+    if (periodFilter === 'quarter') return allBizOrders.filter((o) => o.date >= thisQuarterStart);
+    return bizOrders;
+  }, [periodFilter, bizOrders, allBizOrders, thisQuarterStart]);
+
+  const aggregateBills = (billList: typeof bills) => {
+    const map = new Map<string, { billedOrders: number; clients: Set<string>; revenue: number; commission: number }>();
     for (const b of billList) {
       if (!b.biz_name) continue;
       let s = map.get(b.biz_name);
-      if (!s) { s = { orders: 0, clients: new Set(), revenue: 0, commission: 0 }; map.set(b.biz_name, s); }
-      s.orders++; if (b.order_client) s.clients.add(b.order_client);
+      if (!s) { s = { billedOrders: 0, clients: new Set(), revenue: 0, commission: 0 }; map.set(b.biz_name, s); }
+      s.billedOrders++; if (b.order_client) s.clients.add(b.order_client);
       s.revenue += b.paid; s.commission += b.biz_commission;
     }
     return map;
   };
 
-  const periodStats = useMemo(() => aggregate(periodBills), [periodBills]);
-  const allTimeStats = useMemo(() => aggregate(allBills), [allBills]);
+  // 从订单统计预定数
+  const aggregateOrders = (orderList: Order[]) => {
+    const map = new Map<string, { orderCount: number; clients: Set<string>; estimatedRevenue: number }>();
+    for (const o of orderList) {
+      if (!o.biz_name) continue;
+      let s = map.get(o.biz_name);
+      if (!s) { s = { orderCount: 0, clients: new Set(), estimatedRevenue: 0 }; map.set(o.biz_name, s); }
+      s.orderCount++;
+      s.clients.add(o.client);
+      s.estimatedRevenue += o.estimated || 0;
+    }
+    return map;
+  };
+
+  const periodBillStats = useMemo(() => aggregateBills(periodBills), [periodBills]);
+  const allTimeBillStats = useMemo(() => aggregateBills(allBills), [allBills]);
+  const periodOrderStats = useMemo(() => aggregateOrders(periodOrders), [periodOrders]);
+  const allTimeOrderStats = useMemo(() => aggregateOrders(allBizOrders), [allBizOrders]);
 
   const totalPeriodRevenue = useMemo(() => {
     let sum = 0;
-    periodStats.forEach((v) => { sum += v.revenue; });
+    periodBillStats.forEach((v) => { sum += v.revenue; });
     return sum;
-  }, [periodStats]);
-  const totalPeriodCommission = useMemo(() => {
-    // 使用规则重新计算
+  }, [periodBillStats]);
+  const totalPeriodEstimated = useMemo(() => {
     let sum = 0;
-    periodStats.forEach((v) => { sum += calcCommission(v.revenue, rules); });
+    periodOrderStats.forEach((v) => { sum += v.estimatedRevenue; });
     return sum;
-  }, [periodStats, rules]);
+  }, [periodOrderStats]);
+  const totalPeriodCommission = useMemo(() => {
+    let sum = 0;
+    periodBillStats.forEach((v) => { sum += calcCommission(v.revenue, rules); });
+    return sum;
+  }, [periodBillStats, rules]);
   const totalAllRevenue = useMemo(() => {
     let sum = 0;
-    allTimeStats.forEach((v) => { sum += v.revenue; });
+    allTimeBillStats.forEach((v) => { sum += v.revenue; });
     return sum;
-  }, [allTimeStats]);
+  }, [allTimeBillStats]);
   const totalSettled = useMemo(() => settlements.reduce((s, v) => s + v.amount, 0), [settlements]);
 
   const ranking = useMemo(() => {
     const names = new Set<string>();
     contacts.forEach((c) => names.add(c.name));
-    periodStats.forEach((_, k) => names.add(k));
-    allTimeStats.forEach((_, k) => names.add(k));
+    periodBillStats.forEach((_, k) => names.add(k));
+    allTimeBillStats.forEach((_, k) => names.add(k));
+    periodOrderStats.forEach((_, k) => names.add(k));
+    allTimeOrderStats.forEach((_, k) => names.add(k));
     return Array.from(names).map((name) => {
-      const ps = periodStats.get(name);
-      const as_ = allTimeStats.get(name);
+      const pbs = periodBillStats.get(name);
+      const abs = allTimeBillStats.get(name);
+      const pos = periodOrderStats.get(name);
+      const aos = allTimeOrderStats.get(name);
       const contact = contacts.find((c) => c.name === name);
       const settled = settlements.filter((s) => s.biz_name === name).reduce((sum, s) => sum + s.amount, 0);
-      const periodRevenue = ps?.revenue || 0;
+      const periodRevenue = pbs?.revenue || 0;
       const periodCommission = calcCommission(periodRevenue, rules);
       return {
         name,
         contact,
         periodRevenue,
         periodCommission,
-        periodOrders: ps?.orders || 0,
-        allRevenue: as_?.revenue || 0,
-        allCommission: as_?.commission || 0,
-        allOrders: as_?.orders || 0,
+        periodOrders: pos?.orderCount || 0,
+        periodBilledOrders: pbs?.billedOrders || 0,
+        periodEstimated: pos?.estimatedRevenue || 0,
+        allRevenue: abs?.revenue || 0,
+        allCommission: abs?.commission || 0,
+        allOrders: aos?.orderCount || 0,
+        allBilledOrders: abs?.billedOrders || 0,
         settled,
-        unsettled: (as_?.commission || 0) - settled,
+        unsettled: (abs?.commission || 0) - settled,
         reachedThreshold: rules.mode !== 'threshold' || periodRevenue >= rules.threshold,
       };
-    }).sort((a, b) => b.periodRevenue - a.periodRevenue);
-  }, [periodStats, allTimeStats, contacts, settlements, rules]);
+    }).sort((a, b) => (b.periodOrders + b.periodBilledOrders) - (a.periodOrders + a.periodBilledOrders) || b.periodRevenue - a.periodRevenue);
+  }, [periodBillStats, allTimeBillStats, periodOrderStats, allTimeOrderStats, contacts, settlements, rules]);
 
   // --- Contact CRUD ---
   const openCreateContact = () => {
@@ -260,6 +314,11 @@ export default function BusinessPage() {
     if (!selectedContact) return [];
     return settlements.filter((s) => s.biz_name === selectedContact.name);
   }, [selectedContact, settlements]);
+
+  const detailOrders = useMemo(() => {
+    if (!selectedContact) return [];
+    return allBizOrders.filter((o) => o.biz_name === selectedContact.name);
+  }, [selectedContact, allBizOrders]);
 
   const detailTotalCommission = detailBills.reduce((s, b) => s + b.biz_commission, 0);
   const detailTotalSettled = detailSettlements.reduce((s, v) => s + v.amount, 0);
@@ -403,7 +462,15 @@ export default function BusinessPage() {
           {selectedContact.note && <div className="col-span-2"><span className="text-[var(--ink3)] text-xs">备注</span><p>{selectedContact.note}</p></div>}
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
+            <div className="text-xs text-[var(--ink3)]">累计预定</div>
+            <div className="text-lg font-bold mt-1">{detailOrders.length}单</div>
+          </div>
+          <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
+            <div className="text-xs text-[var(--ink3)]">已结账</div>
+            <div className="text-lg font-bold text-[var(--blue)] mt-1">{detailBills.length}单</div>
+          </div>
           <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
             <div className="text-xs text-[var(--ink3)]">累计提成</div>
             <div className="text-lg font-bold text-[var(--amber)] mt-1">¥{detailTotalCommission.toLocaleString()}</div>
@@ -425,9 +492,40 @@ export default function BusinessPage() {
           </button>
         )}
 
+        {/* 预定记录 */}
+        {detailOrders.length > 0 && (
+          <div className="bg-white rounded-lg border border-[var(--border)] overflow-hidden">
+            <div className="px-3 py-2 bg-[var(--bg)] text-xs font-semibold text-[var(--ink2)]">
+              预定记录（{detailOrders.length}单）
+            </div>
+            {detailOrders.map((o) => (
+              <div key={o.id} className="px-3 py-2 border-t border-[var(--border2)] text-sm">
+                <div className="flex justify-between">
+                  <div>
+                    <span className="font-medium">{o.client}</span>
+                    <span className="text-xs text-[var(--ink3)] ml-2">{o.date} · {o.slot} · {o.pax}人</span>
+                  </div>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full
+                    ${o.status === '待确认' ? 'bg-[#FFF3CD] text-[#856404]'
+                    : o.status === '已确认' ? 'bg-[#D4EDDA] text-[#155724]'
+                    : o.status === '已收款' ? 'bg-[#E8D5F5] text-[#6F42C1]'
+                    : o.status === '已入账' ? 'bg-[#CCE5FF] text-[#004085]'
+                    : 'bg-gray-100 text-gray-500'}`}>
+                    {o.status}
+                  </span>
+                </div>
+                {o.estimated > 0 && (
+                  <div className="text-xs text-[var(--ink3)] mt-0.5">预估 ¥{o.estimated.toLocaleString()}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 结账明细 */}
         <div className="bg-white rounded-lg border border-[var(--border)] overflow-hidden">
           <div className="px-3 py-2 bg-[var(--bg)] text-xs font-semibold text-[var(--ink2)]">
-            关联订单明细（{detailBills.length}笔）
+            结账明细（{detailBills.length}笔）
           </div>
           {detailBills.length === 0 && <div className="px-3 py-6 text-center text-xs text-[var(--ink3)]">暂无</div>}
           {detailBills.map((b) => (
@@ -535,8 +633,11 @@ export default function BusinessPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
-          <div className="text-[10px] text-[var(--ink3)]">{periodLabel}商务收入</div>
+          <div className="text-[10px] text-[var(--ink3)]">{periodLabel}商务收入（已结账）</div>
           <div className="text-lg font-bold text-[var(--green)] mt-1">¥{totalPeriodRevenue.toLocaleString()}</div>
+          {totalPeriodEstimated > 0 && totalPeriodEstimated !== totalPeriodRevenue && (
+            <div className="text-[10px] text-[var(--ink3)] mt-0.5">预估 ¥{totalPeriodEstimated.toLocaleString()}</div>
+          )}
         </div>
         <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
           <div className="text-[10px] text-[var(--ink3)]">{periodLabel}应付提成</div>
@@ -592,7 +693,7 @@ export default function BusinessPage() {
                 )}
               </div>
               <div className="text-xs text-[var(--ink3)]">
-                {periodLabel} {stat.periodOrders}单 ¥{stat.periodRevenue.toLocaleString()} · 累计 {stat.allOrders}单
+                {periodLabel} {stat.periodOrders}单预定{stat.periodBilledOrders > 0 ? ` · ${stat.periodBilledOrders}单已结账 ¥${stat.periodRevenue.toLocaleString()}` : stat.periodEstimated > 0 ? ` · 预估 ¥${stat.periodEstimated.toLocaleString()}` : ''} · 累计 {stat.allOrders}单
               </div>
             </div>
             <div className="text-right">
