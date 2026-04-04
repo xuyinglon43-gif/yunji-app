@@ -23,6 +23,7 @@ interface Member {
 
 const DEFAULT_DISCOUNTS: Record<string, number> = {
   '散客': 100,
+  '特别VIP': 100,
   '逢吉': 100,
   '承吉': 88,
   '享吉': 75,

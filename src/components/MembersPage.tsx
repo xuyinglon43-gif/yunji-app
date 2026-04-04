@@ -21,6 +21,7 @@ export default function MembersPage() {
   const [memberOrders, setMemberOrders] = useState<Order[]>([]);
   const [memberBills, setMemberBills] = useState<Bill[]>([]);
   const [rechargeAmount, setRechargeAmount] = useState('');
+  const [bizSuggestions, setBizSuggestions] = useState<{ id: number; name: string; phone: string }[]>([]);
 
   function emptyForm() {
     return { name: '', phone: '', level: '散客', discount: 100, balance: 0, fee_expiry: '', old_debt: 0, biz_name: '', note: '' };
@@ -40,6 +41,26 @@ export default function MembersPage() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchMembers(); }, [search, levelFilter]);
+
+  // 商务联系人自动推荐
+  useEffect(() => {
+    const q = form.biz_name.trim();
+    if (q.length < 1 || !(modalMode === 'create' || modalMode === 'edit')) {
+      setBizSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from('business_contacts')
+        .select('id, name, phone')
+        .ilike('name', `%${q}%`)
+        .eq('status', 'active')
+        .is('deleted_at', null)
+        .limit(5);
+      if (data) setBizSuggestions(data);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [form.biz_name, modalMode]);
 
   // 计算沉睡会员（60天未到访）
   const dormantMembers = useMemo(() => {
@@ -108,6 +129,16 @@ export default function MembersPage() {
       discount: form.discount, balance: form.balance,
       fee_expiry: form.fee_expiry || null, old_debt: form.old_debt, biz_name: form.biz_name || null, note: form.note,
     };
+    // 商务联系人：不存在则自动新建
+    const bizName = form.biz_name.trim();
+    if (bizName) {
+      supabase.from('business_contacts').select('id').eq('name', bizName).is('deleted_at', null).limit(1)
+        .then(({ data }) => {
+          if (!data || data.length === 0) {
+            supabase.from('business_contacts').insert({ name: bizName, status: 'active' });
+          }
+        });
+    }
     // 立即关闭弹窗，乐观更新本地列表
     setModalMode(null);
     if (isEdit && selectedMember) {
@@ -326,11 +357,22 @@ export default function MembersPage() {
                   <input type="number" min="0" value={form.old_debt} onChange={(e) => updateForm('old_debt', parseInt(e.target.value) || 0)}
                     className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
                 </label>
-                <label className="block">
+                <div className="relative">
                   <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">商务</span>
-                  <input type="text" value={form.biz_name} onChange={(e) => updateForm('biz_name', e.target.value)} placeholder="介绍商务姓名"
+                  <input type="text" value={form.biz_name} onChange={(e) => updateForm('biz_name', e.target.value)} placeholder="输入搜索或新增商务"
                     className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
-                </label>
+                  {bizSuggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-[var(--border)] rounded-md shadow-lg z-10 max-h-40 overflow-y-auto">
+                      {bizSuggestions.map((b) => (
+                        <button key={b.id} onClick={() => { updateForm('biz_name', b.name); setBizSuggestions([]); }}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--bg)] flex justify-between items-center">
+                          <span className="font-medium">{b.name}</span>
+                          {b.phone && <span className="text-[10px] text-[var(--ink3)]">{b.phone}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <label className="block">
                 <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">备注</span>

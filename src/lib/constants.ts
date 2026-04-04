@@ -48,7 +48,7 @@ export const ORDER_TYPES = ['餐饮', '喝茶', '活动/会议', 'KTV'] as const
 
 export const ACTIONS = ['吃饭', '喝茶', '唱歌', '开会', '活动', '商务会谈', '生日宴', '婚宴'] as const;
 
-export const MEMBER_LEVELS = ['散客', '逢吉', '承吉', '享吉', '开吉', '云集旧会员', '股东'] as const;
+export const MEMBER_LEVELS = ['散客', '特别VIP', '逢吉', '承吉', '享吉', '开吉', '云集旧会员', '股东'] as const;
 
 export const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   '待确认': { bg: 'bg-[#FFF3CD]', text: 'text-[#856404]', border: 'border-[#F0C040]' },
