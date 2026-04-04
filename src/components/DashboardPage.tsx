@@ -5,8 +5,9 @@ import { supabase } from '@/lib/supabase';
 import { Bill, Expense, Member, AuditLog, Order } from '@/lib/types';
 import { restoreRecord } from '@/lib/audit';
 import { useAuth } from '@/lib/auth';
+import { APP_VERSION, CHANGELOG } from '@/lib/changelog';
 
-type Panel = 'dashboard' | 'audit' | 'deleted';
+type Panel = 'dashboard' | 'audit' | 'deleted' | 'changelog';
 
 // Deleted record with table info
 interface DeletedRecord {
@@ -167,6 +168,7 @@ export default function DashboardPage() {
           { id: 'dashboard' as Panel, label: '数据总览' },
           { id: 'audit' as Panel, label: '操作日志' },
           { id: 'deleted' as Panel, label: '已删除数据' },
+          { id: 'changelog' as Panel, label: `更新日志 ${APP_VERSION}` },
         ].map((tab) => (
           <button key={tab.id} onClick={() => switchPanel(tab.id)}
             className={`px-3 py-1.5 text-xs rounded-md border transition
@@ -336,6 +338,32 @@ export default function DashboardPage() {
             </div>
           </div>
         </>
+      )}
+
+      {panel === 'changelog' && (
+        <div className="space-y-4">
+          {CHANGELOG.map((entry) => (
+            <div key={entry.version} className="bg-white rounded-lg border border-[var(--border)] overflow-hidden">
+              <div className="px-4 py-3 bg-[var(--bg)] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold">{entry.version}</span>
+                  {entry.version === APP_VERSION && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--green-bg)] text-[var(--green)] border border-[var(--green-border)]">当前版本</span>
+                  )}
+                </div>
+                <span className="text-xs text-[var(--ink3)]">{entry.date}</span>
+              </div>
+              <div className="px-4 py-3 space-y-1.5">
+                {entry.changes.map((change, i) => (
+                  <div key={i} className="flex gap-2 text-sm">
+                    <span className="text-[var(--green)] flex-shrink-0">·</span>
+                    <span className="text-[var(--ink2)]">{change}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

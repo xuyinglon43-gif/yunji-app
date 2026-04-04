@@ -2,6 +2,7 @@
 
 import { useState, KeyboardEvent } from 'react';
 import { useAuth } from '@/lib/auth';
+import { APP_VERSION, CHANGELOG } from '@/lib/changelog';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -59,8 +60,21 @@ export default function LoginScreen() {
         </div>
 
         <p className="text-center text-[10px] text-[var(--ink3)] mt-8">
-          云吉合院 · 运营管理系统 v1.0
+          云吉合院 · 运营管理系统 {APP_VERSION}
         </p>
+        {CHANGELOG[0] && (
+          <div className="mt-4 px-2">
+            <div className="text-[10px] text-[var(--ink3)] text-center mb-1">最近更新 · {CHANGELOG[0].date}</div>
+            <div className="text-[10px] text-[var(--ink3)] space-y-0.5">
+              {CHANGELOG[0].changes.slice(0, 3).map((c, i) => (
+                <p key={i}>· {c}</p>
+              ))}
+              {CHANGELOG[0].changes.length > 3 && (
+                <p className="text-[var(--ink3)]/60">等 {CHANGELOG[0].changes.length} 项更新</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
