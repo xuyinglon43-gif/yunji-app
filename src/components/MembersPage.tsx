@@ -17,7 +17,6 @@ export default function MembersPage() {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [form, setForm] = useState(emptyForm());
-  const [saving, setSaving] = useState(false);
   const [memberOrders, setMemberOrders] = useState<Order[]>([]);
   const [memberBills, setMemberBills] = useState<Bill[]>([]);
   const [rechargeAmount, setRechargeAmount] = useState('');
@@ -381,8 +380,8 @@ export default function MembersPage() {
               </label>
             </div>
             <div className="flex gap-3 px-4 py-3 border-t border-[var(--border)]">
-              <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg hover:opacity-90 transition disabled:opacity-50">
-                {saving ? '保存中...' : '保存'}
+              <button onClick={handleSave} className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg hover:opacity-90 transition disabled:opacity-50">
+                保存
               </button>
               <button onClick={() => setModalMode(null)} className="flex-1 py-2.5 text-sm border border-[var(--border)] rounded-lg hover:bg-[var(--bg)] transition">取消</button>
             </div>
@@ -419,9 +418,9 @@ export default function MembersPage() {
               )}
             </div>
             <div className="flex gap-3 px-4 py-3 border-t border-[var(--border)]">
-              <button onClick={handleRecharge} disabled={saving}
-                className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg hover:opacity-90 transition disabled:opacity-50">
-                {saving ? '处理中...' : '确认充值'}
+              <button onClick={handleRecharge}
+                className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg hover:opacity-90 transition">
+                确认充值
               </button>
               <button onClick={() => setModalMode(null)} className="flex-1 py-2.5 text-sm border border-[var(--border)] rounded-lg hover:bg-[var(--bg)] transition">取消</button>
             </div>

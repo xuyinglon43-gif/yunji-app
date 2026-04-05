@@ -52,7 +52,6 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
   const [memberSuggestions, setMemberSuggestions] = useState<Member[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [bizSuggestions, setBizSuggestions] = useState<{ id: number; name: string; phone: string }[]>([]);
-  const [saving, setSaving] = useState(false);
 
   // Member autocomplete
   useEffect(() => {
@@ -355,10 +354,9 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
         <div className="flex gap-3 px-4 py-3 border-t border-[var(--border)]">
           <button
             onClick={handleSave}
-            disabled={saving}
-            className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg hover:opacity-90 transition disabled:opacity-50"
+            className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg hover:opacity-90 transition"
           >
-            {saving ? '保存中...' : '保存预定'}
+            保存预定
           </button>
           <button
             onClick={onClose}
