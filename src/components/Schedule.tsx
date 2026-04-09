@@ -43,6 +43,7 @@ const DAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
 const BAND_COLORS: Record<string, { bg: string; border: string }> = {
   '待确认': { bg: '#FFF3CD', border: '#F0C040' },
   '已确认': { bg: '#D4EDDA', border: '#5CB85C' },
+  '待结账': { bg: '#FFE0CC', border: '#FF8C42' },
   '已收款': { bg: '#E8D5F5', border: '#9B59B6' },
   '已入账': { bg: '#CCE5FF', border: '#2196F3' },
 };
@@ -50,6 +51,7 @@ const BAND_COLORS: Record<string, { bg: string; border: string }> = {
 const BAND_TEXT_COLORS: Record<string, string> = {
   '待确认': '#856404',
   '已确认': '#155724',
+  '待结账': '#C35A00',
   '已收款': '#6F42C1',
   '已入账': '#004085',
 };

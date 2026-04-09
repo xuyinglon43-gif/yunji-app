@@ -88,6 +88,11 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
     onUpdated();
   };
 
+  const handleMarkPendingBill = async () => {
+    await supabase.from('orders').update({ status: '待结账' }).eq('id', orderId);
+    onUpdated();
+  };
+
   const handleCancel = async () => {
     const reason = prompt('请输入取消原因：');
     if (reason === null) return;
@@ -491,10 +496,10 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {can('edit') && (order.status === '待确认' || order.status === '已确认') && (
+            {can('edit') && (order.status === '待确认' || order.status === '已确认' || order.status === '待结账') && (
               <button onClick={startEdit} className="text-xs text-[var(--blue)] hover:underline">编辑</button>
             )}
-            {can('edit') && order.status === '已确认' && (
+            {can('edit') && (order.status === '已确认' || order.status === '待结账') && (
               <button onClick={startBill} className="text-xs text-[var(--purple)] hover:underline">结账</button>
             )}
             {can('edit') && (
@@ -584,12 +589,24 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
         </div>
 
         {/* Actions based on status */}
-        {can('edit') && (order.status === '待确认' || order.status === '已确认') && (
+        {can('edit') && (order.status === '待确认' || order.status === '已确认' || order.status === '待结账') && (
           <div className="flex gap-2 px-4 py-3 border-t border-[var(--border)]">
             {order.status === '待确认' && (
               <button onClick={handleConfirm}
                 className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg hover:opacity-90 transition">
                 确认预定
+              </button>
+            )}
+            {order.status === '已确认' && (
+              <button onClick={handleMarkPendingBill}
+                className="flex-1 py-2.5 text-sm bg-[#FF8C42] text-white rounded-lg hover:opacity-90 transition">
+                标记待结账
+              </button>
+            )}
+            {order.status === '待结账' && (
+              <button onClick={startBill}
+                className="flex-1 py-2.5 text-sm bg-[var(--purple)] text-white rounded-lg hover:opacity-90 transition">
+                去结账
               </button>
             )}
             <button onClick={handleCancel}

@@ -7,13 +7,14 @@ import { useAuth } from '@/lib/auth';
 import { Order } from '@/lib/types';
 import OrderDetailModal from './OrderDetailModal';
 
-const STATUSES = ['全部', '待确认', '已确认', '已收款', '已入账', '已取消'];
+const STATUSES = ['全部', '待确认', '已确认', '待结账', '已收款', '已入账', '已取消'];
 const STATUS_PRIORITY: Record<string, number> = {
   '待确认': 0,
   '已确认': 1,
-  '已收款': 2,
-  '已入账': 3,
-  '已取消': 4,
+  '待结账': 2,
+  '已收款': 3,
+  '已入账': 4,
+  '已取消': 5,
 };
 const DONE_STATUSES = new Set(['已入账', '已取消']);
 const DAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'];

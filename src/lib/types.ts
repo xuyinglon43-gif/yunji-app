@@ -52,7 +52,7 @@ export interface Member {
   name: string;
   phone: string;
   level: string;
-  discount: number;
+  discount: number | null;
   balance: number;
   fee_expiry: string | null;
   old_debt: number;
@@ -60,6 +60,12 @@ export interface Member {
   visits: number;
   biz_name: string;
   note: string;
+  wine_balance: number;
+  venue_balance: number;
+  venue_discount: number | null;
+  no_service_fee: boolean;
+  source: string | null;
+  old_card_no: string | null;
   created_at: string;
   deleted_at: string | null;
   deleted_by: string | null;
@@ -132,6 +138,23 @@ export const DEFAULT_DISCOUNTS: Record<string, number> = {
 };
 
 export const PAYMENT_METHODS = ['微信', '现金', '储值扣减', '挂账', '转账'] as const;
+
+// 折扣数字转中文显示
+const DISCOUNT_NAMES: Record<number, string> = {
+  50: '五折', 60: '六折', 70: '七折', 75: '75折', 80: '八折',
+  85: '85折', 88: '88折', 90: '九折', 95: '95折', 100: '无折扣',
+};
+export function formatDiscount(val: number | null | undefined): string {
+  if (val === null || val === undefined) return '正常价';
+  if (val === 0) return '免费';
+  return DISCOUNT_NAMES[val] || `${val}%`;
+}
+
+export function formatVenueDiscount(val: number | null | undefined): string {
+  if (val === null || val === undefined) return '正常价';
+  if (val === 0) return '免场地费';
+  return DISCOUNT_NAMES[val] || `${val}%`;
+}
 
 export const EXPENSE_CATEGORIES = [
   '食材采购', '水电费', '物业费', '维修', '办公用品', '交通', '活动费用', '其他'

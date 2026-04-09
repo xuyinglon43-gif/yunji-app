@@ -53,6 +53,7 @@ export const MEMBER_LEVELS = ['散客', '特别VIP', '逢吉', '承吉', '享吉
 export const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   '待确认': { bg: 'bg-[#FFF3CD]', text: 'text-[#856404]', border: 'border-[#F0C040]' },
   '已确认': { bg: 'bg-[#D4EDDA]', text: 'text-[#155724]', border: 'border-[#5CB85C]' },
+  '待结账': { bg: 'bg-[#FFE0CC]', text: 'text-[#C35A00]', border: 'border-[#FF8C42]' },
   '已收款': { bg: 'bg-[#E8D5F5]', text: 'text-[#6F42C1]', border: 'border-[#9B59B6]' },
   '已入账': { bg: 'bg-[#CCE5FF]', text: 'text-[#004085]', border: 'border-[#2196F3]' },
   '已取消': { bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-300' },
@@ -61,6 +62,7 @@ export const STATUS_COLORS: Record<string, { bg: string; text: string; border: s
 export const STATUS_CELL_COLORS: Record<string, string> = {
   '待确认': '#FFF3CD',
   '已确认': '#D4EDDA',
+  '待结账': '#FFE0CC',
   '已收款': '#E8D5F5',
   '已入账': '#CCE5FF',
 };
@@ -68,6 +70,7 @@ export const STATUS_CELL_COLORS: Record<string, string> = {
 export const STATUS_TEXT_COLORS: Record<string, string> = {
   '待确认': '#856404',
   '已确认': '#155724',
+  '待结账': '#C35A00',
   '已收款': '#6F42C1',
   '已入账': '#004085',
 };

@@ -1,4 +1,4 @@
-export const APP_VERSION = 'v2.0';
+export const APP_VERSION = 'v2.1';
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,19 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: 'v2.1',
+    date: '2026-04-09',
+    changes: [
+      '新增"待结账"订单状态，完整流程：待确认→已确认→待结账→已收款→已入账',
+      '会员模块大升级：新增红酒余额、场地余额、场地折扣、免服务费等字段',
+      '导入80条云集/葡萄老会员数据（需执行SQL迁移）',
+      '折扣显示中文化（60→六折、70→七折等）',
+      '会员列表显示来源标签、免服务费标记',
+      '会员详情增加红酒余额、场地余额、场地折扣、来源、旧卡号等信息',
+      '编辑会员时修改等级会记录审计日志',
+    ],
+  },
   {
     version: 'v2.0',
     date: '2026-04-04',

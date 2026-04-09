@@ -54,7 +54,7 @@ export default function HomePage() {
 
       const { data: pb } = await supabase
         .from('orders').select('*')
-        .eq('status', '已确认').is('deleted_at', null).lte('date', fmtDate(today)).order('date').limit(10);
+        .eq('status', '待结账').is('deleted_at', null).order('date').limit(10);
       setPendingBill(pb || []);
 
       const { data: fb } = await supabase
@@ -169,7 +169,7 @@ export default function HomePage() {
             </div>
           )}
           {pendingBill.length > 0 && can('edit') && (
-            <div className="px-3 py-2 bg-[var(--purple-bg)] border border-[var(--purple-border)] rounded-lg text-xs text-[var(--purple)]">
+            <div className="px-3 py-2 bg-[#FFE0CC] border border-[#FF8C42] rounded-lg text-xs text-[#C35A00]">
               {pendingBill.length} 个订单待结账
             </div>
           )}
@@ -279,7 +279,7 @@ export default function HomePage() {
           {pendingBill.map((o) => (
             <div key={o.id} className="flex items-center justify-between px-3 py-2 border-t border-[var(--border2)]">
               <div className="text-sm">
-                <span className="text-[var(--purple)] text-xs mr-1">待结账</span>
+                <span className="text-[#C35A00] text-xs mr-1">待结账</span>
                 <span className="font-medium">{o.client}</span>
                 <span className="text-[var(--ink3)] text-xs ml-2">{o.date} {o.slot}</span>
               </div>

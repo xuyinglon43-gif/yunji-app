@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MEMBER_LEVELS, STATUS_COLORS, VENUES } from '@/lib/constants';
 import { useAuth } from '@/lib/auth';
-import { Member, DEFAULT_DISCOUNTS, Bill, Order } from '@/lib/types';
+import { Member, DEFAULT_DISCOUNTS, Bill, Order, formatDiscount, formatVenueDiscount } from '@/lib/types';
 import { softDelete, hardDelete, writeAuditLog } from '@/lib/audit';
 
 type ModalMode = null | 'create' | 'edit' | 'profile' | 'recharge';
@@ -23,7 +23,7 @@ export default function MembersPage() {
   const [bizSuggestions, setBizSuggestions] = useState<{ id: number; name: string; phone: string }[]>([]);
 
   function emptyForm() {
-    return { name: '', phone: '', level: '散客', discount: 100, balance: 0, fee_expiry: '', old_debt: 0, biz_name: '', note: '' };
+    return { name: '', phone: '', level: '散客', discount: 100 as number | null, balance: 0, fee_expiry: '', old_debt: 0, biz_name: '', note: '', wine_balance: 0, venue_balance: 0, venue_discount: null as number | null, no_service_fee: false };
   }
 
   const fetchMembers = async () => {
@@ -81,6 +81,8 @@ export default function MembersPage() {
       name: m.name, phone: m.phone || '', level: m.level,
       discount: m.discount, balance: m.balance,
       fee_expiry: m.fee_expiry || '', old_debt: m.old_debt, biz_name: m.biz_name || '', note: m.note || '',
+      wine_balance: m.wine_balance || 0, venue_balance: m.venue_balance || 0,
+      venue_discount: m.venue_discount, no_service_fee: m.no_service_fee || false,
     });
     setSelectedMember(m);
     setModalMode('edit');
@@ -127,6 +129,8 @@ export default function MembersPage() {
       name: form.name.trim(), phone: form.phone, level: form.level,
       discount: form.discount, balance: form.balance,
       fee_expiry: form.fee_expiry || null, old_debt: form.old_debt, biz_name: form.biz_name || null, note: form.note,
+      wine_balance: form.wine_balance, venue_balance: form.venue_balance,
+      venue_discount: form.venue_discount, no_service_fee: form.no_service_fee,
     };
     // 商务联系人：不存在则自动新建
     const bizName = form.biz_name.trim();
@@ -146,7 +150,11 @@ export default function MembersPage() {
     // 后台写入数据库
     if (isEdit && selectedMember) {
       supabase.from('members').update(memberData).eq('id', selectedMember.id).then(() => fetchMembers());
-      writeAuditLog('members', savedId!, '编辑', `编辑会员 ${form.name}`, roleLabel);
+      if (selectedMember.level !== form.level) {
+        writeAuditLog('members', savedId!, '等级变更', `${form.name} 等级从「${selectedMember.level}」改为「${form.level}」`, roleLabel);
+      } else {
+        writeAuditLog('members', savedId!, '编辑', `编辑会员 ${form.name}`, roleLabel);
+      }
     } else {
       supabase.from('members').insert(memberData).then(() => fetchMembers());
     }
@@ -164,11 +172,11 @@ export default function MembersPage() {
     fetchMembers();
   };
 
-  const updateForm = (key: string, value: string | number) => {
+  const updateForm = (key: string, value: string | number | boolean | null) => {
     setForm((f) => {
       const next = { ...f, [key]: value };
       if (key === 'level' && typeof value === 'string') {
-        next.discount = DEFAULT_DISCOUNTS[value] || 100;
+        next.discount = DEFAULT_DISCOUNTS[value] ?? null;
       }
       return next;
     });
@@ -268,6 +276,16 @@ export default function MembersPage() {
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--purple-bg)] text-[var(--purple)] border border-[var(--purple-border)]">
                     {m.level}
                   </span>
+                  {m.source && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--bg)] text-[var(--ink3)]">
+                      {m.source}
+                    </span>
+                  )}
+                  {m.no_service_fee && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--green-bg)] text-[var(--green)]">
+                      免服务费
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="text-xs text-[var(--ink3)] space-y-0.5">
@@ -278,9 +296,18 @@ export default function MembersPage() {
                 {canSeeFinancials && (
                   <>
                     <div className="flex justify-between">
-                      <span>折扣: {m.discount}%</span>
-                      <span>余额: ¥{m.balance.toLocaleString()}</span>
+                      <span>餐饮: {formatDiscount(m.discount)}</span>
+                      <span>储值: ¥{m.balance.toLocaleString()}</span>
                     </div>
+                    {(m.wine_balance > 0 || m.venue_balance > 0) && (
+                      <div className="flex justify-between">
+                        {m.wine_balance > 0 && <span>红酒: ¥{m.wine_balance.toLocaleString()}</span>}
+                        {m.venue_balance > 0 && <span>场地: ¥{m.venue_balance.toLocaleString()}</span>}
+                      </div>
+                    )}
+                    {m.venue_discount !== null && m.venue_discount !== undefined && (
+                      <span>场地折扣: {formatVenueDiscount(m.venue_discount)}</span>
+                    )}
                     {m.old_debt > 0 && (
                       <div className="text-[var(--amber)]">旧债: ¥{m.old_debt.toLocaleString()}</div>
                     )}
@@ -333,8 +360,8 @@ export default function MembersPage() {
                   </select>
                 </label>
                 <label className="block">
-                  <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">默认折扣 (%)</span>
-                  <input type="number" min="1" max="100" value={form.discount} onChange={(e) => updateForm('discount', parseInt(e.target.value) || 100)}
+                  <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">餐饮折扣 (%)</span>
+                  <input type="number" min="0" max="100" value={form.discount ?? ''} onChange={(e) => updateForm('discount', e.target.value ? parseInt(e.target.value) : null)}
                     className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
                 </label>
               </div>
@@ -348,6 +375,39 @@ export default function MembersPage() {
                   <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">年费到期日</span>
                   <input type="date" value={form.fee_expiry} onChange={(e) => updateForm('fee_expiry', e.target.value)}
                     className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">红酒余额</span>
+                  <input type="number" value={form.wine_balance} onChange={(e) => updateForm('wine_balance', parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
+                </label>
+                <label className="block">
+                  <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">场地余额</span>
+                  <input type="number" value={form.venue_balance} onChange={(e) => updateForm('venue_balance', parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">场地折扣</span>
+                  <select value={form.venue_discount === null ? 'null' : String(form.venue_discount)}
+                    onChange={(e) => updateForm('venue_discount', e.target.value === 'null' ? null : parseInt(e.target.value))}
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]">
+                    <option value="null">正常价</option>
+                    <option value="0">免场地费</option>
+                    <option value="60">六折</option>
+                    <option value="70">七折</option>
+                    <option value="80">八折</option>
+                    <option value="90">九折</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 pt-5">
+                  <input type="checkbox" checked={form.no_service_fee}
+                    onChange={(e) => updateForm('no_service_fee', e.target.checked)}
+                    className="w-4 h-4 rounded border-[var(--border)]" />
+                  <span className="text-sm text-[var(--ink2)]">免服务费</span>
                 </label>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -467,13 +527,29 @@ export default function MembersPage() {
                 {canSeeFinancials && (
                   <>
                     <div className="bg-[var(--bg)] rounded-md p-2">
-                      <div className="text-[10px] text-[var(--ink3)]">折扣</div>
-                      <div className="text-sm font-medium">{selectedMember.discount}%</div>
+                      <div className="text-[10px] text-[var(--ink3)]">餐饮折扣</div>
+                      <div className="text-sm font-medium">{formatDiscount(selectedMember.discount)}</div>
+                    </div>
+                    <div className="bg-[var(--bg)] rounded-md p-2">
+                      <div className="text-[10px] text-[var(--ink3)]">场地折扣</div>
+                      <div className="text-sm font-medium">{formatVenueDiscount(selectedMember.venue_discount)}</div>
                     </div>
                     <div className="bg-[var(--bg)] rounded-md p-2">
                       <div className="text-[10px] text-[var(--ink3)]">储值余额</div>
-                      <div className="text-sm font-medium text-[var(--green)]">¥{selectedMember.balance.toLocaleString()}</div>
+                      <div className={`text-sm font-medium ${selectedMember.balance >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>¥{selectedMember.balance.toLocaleString()}</div>
                     </div>
+                    {(selectedMember.wine_balance || 0) !== 0 && (
+                      <div className="bg-[var(--bg)] rounded-md p-2">
+                        <div className="text-[10px] text-[var(--ink3)]">红酒余额</div>
+                        <div className="text-sm font-medium">¥{selectedMember.wine_balance.toLocaleString()}</div>
+                      </div>
+                    )}
+                    {(selectedMember.venue_balance || 0) !== 0 && (
+                      <div className="bg-[var(--bg)] rounded-md p-2">
+                        <div className="text-[10px] text-[var(--ink3)]">场地余额</div>
+                        <div className="text-sm font-medium">¥{selectedMember.venue_balance.toLocaleString()}</div>
+                      </div>
+                    )}
                     <div className="bg-[var(--bg)] rounded-md p-2">
                       <div className="text-[10px] text-[var(--ink3)]">累计消费</div>
                       <div className="text-sm font-medium">¥{selectedMember.total_spent.toLocaleString()}</div>
@@ -482,6 +558,12 @@ export default function MembersPage() {
                       <div className="bg-[var(--bg)] rounded-md p-2">
                         <div className="text-[10px] text-[var(--ink3)]">场均消费</div>
                         <div className="text-sm font-medium">¥{avgSpend.toLocaleString()}</div>
+                      </div>
+                    )}
+                    {selectedMember.no_service_fee && (
+                      <div className="bg-[var(--green-bg)] rounded-md p-2">
+                        <div className="text-[10px] text-[var(--green)]">免服务费</div>
+                        <div className="text-sm font-medium text-[var(--green)]">是</div>
                       </div>
                     )}
                     {selectedMember.old_debt > 0 && (
@@ -494,6 +576,18 @@ export default function MembersPage() {
                       <div className="bg-[var(--bg)] rounded-md p-2">
                         <div className="text-[10px] text-[var(--ink3)]">年费到期</div>
                         <div className="text-sm font-medium">{selectedMember.fee_expiry}</div>
+                      </div>
+                    )}
+                    {selectedMember.source && (
+                      <div className="bg-[var(--bg)] rounded-md p-2">
+                        <div className="text-[10px] text-[var(--ink3)]">来源</div>
+                        <div className="text-sm font-medium">{selectedMember.source}</div>
+                      </div>
+                    )}
+                    {selectedMember.old_card_no && (
+                      <div className="bg-[var(--bg)] rounded-md p-2">
+                        <div className="text-[10px] text-[var(--ink3)]">旧卡号</div>
+                        <div className="text-sm font-medium">{selectedMember.old_card_no}</div>
                       </div>
                     )}
                   </>
