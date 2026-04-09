@@ -34,7 +34,6 @@ export default function FinancePage() {
     note: '',
   });
   const [expItems, setExpItems] = useState<ExpenseItem[]>([]);
-  const [saving, setSaving] = useState(false);
 
   const thisMonth = new Date().toISOString().slice(0, 7);
 
@@ -543,8 +542,8 @@ export default function FinancePage() {
               </div>
             </div>
             <div className="flex gap-3 px-4 py-3 border-t border-[var(--border)]">
-              <button onClick={submitExpense} disabled={saving} className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg hover:opacity-90 transition disabled:opacity-50">
-                {saving ? '提交中...' : '提交申请'}
+              <button onClick={submitExpense} className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg hover:opacity-90 transition">
+                提交申请
               </button>
               <button onClick={() => setShowExpenseForm(false)} className="flex-1 py-2.5 text-sm border border-[var(--border)] rounded-lg hover:bg-[var(--bg)] transition">取消
               </button>

@@ -84,7 +84,6 @@ export default function BusinessPage() {
   const [settleAmount, setSettleAmount] = useState('');
   const [settleNote, setSettleNote] = useState('');
   const [showSettle, setShowSettle] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [rules, setRules] = useState<CommissionRules>(DEFAULT_RULES);
   const [periodFilter, setPeriodFilter] = useState<'month' | 'quarter' | 'all'>('month');
   const [bizOrders, setBizOrders] = useState<Order[]>([]);
@@ -583,8 +582,8 @@ export default function BusinessPage() {
                 </label>
               </div>
               <div className="flex gap-3 px-4 py-3 border-t border-[var(--border)]">
-                <button onClick={doSettle} disabled={saving} className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg disabled:opacity-50">
-                  {saving ? '处理中...' : '确认结算'}
+                <button onClick={doSettle} className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg disabled:opacity-50">
+                  确认结算
                 </button>
                 <button onClick={() => setShowSettle(false)} className="flex-1 py-2.5 text-sm border border-[var(--border)] rounded-lg">取消</button>
               </div>
@@ -740,8 +739,8 @@ export default function BusinessPage() {
               </label>
             </div>
             <div className="flex gap-3 px-4 py-3 border-t border-[var(--border)]">
-              <button onClick={saveContact} disabled={saving} className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg disabled:opacity-50">
-                {saving ? '保存中...' : '保存'}
+              <button onClick={saveContact} className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg disabled:opacity-50">
+                保存
               </button>
               <button onClick={() => setShowForm(false)} className="flex-1 py-2.5 text-sm border border-[var(--border)] rounded-lg">取消</button>
             </div>
