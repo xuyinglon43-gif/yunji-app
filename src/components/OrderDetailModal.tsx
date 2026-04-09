@@ -29,7 +29,6 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
   // Bill form state
   const [billForm, setBillForm] = useState({
     total: '',
-    discount: '100',
     food_cost: '',
     method: '微信',
     butler: '',
@@ -153,11 +152,10 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
 
   // --- Billing ---
   const startBill = () => {
-    const memberDiscount = member?.discount || DEFAULT_DISCOUNTS[order.member_level] || 100;
+    const defaultFoodCost = order.estimated ? Math.round(order.estimated * 0.33) : 0;
     setBillForm({
-      total: String(order.estimated || ''),
-      discount: String(memberDiscount),
-      food_cost: '',
+      total: '',
+      food_cost: defaultFoodCost > 0 ? String(defaultFoodCost) : '',
       method: '微信',
       butler: '',
       server: '',
@@ -169,12 +167,10 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
 
   const saveBill = async () => {
     const total = parseInt(billForm.total) || 0;
-    const discount = parseInt(billForm.discount) || 100;
     const food_cost = parseInt(billForm.food_cost) || 0;
-    const discounted = Math.round(total * discount / 100);
-    const paid = discounted - (order.deposit || 0);
+    const paid = total - (order.deposit || 0);
 
-    if (total <= 0) return alert('请填写消费金额');
+    if (total <= 0) return alert('请填写实收金额');
 
     setSaving(true);
 
@@ -218,7 +214,7 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
       order_id: orderId,
       date: new Date().toISOString().split('T')[0],
       total,
-      discount,
+      discount: 100,
       food_cost,
       paid,
       method: billForm.method,
@@ -367,9 +363,7 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
   // --- BILL MODE ---
   if (mode === 'bill') {
     const total = parseInt(billForm.total) || 0;
-    const discount = parseInt(billForm.discount) || 100;
-    const discounted = Math.round(total * discount / 100);
-    const finalPaid = discounted - (order.deposit || 0);
+    const finalPaid = total - (order.deposit || 0);
 
     return (
       <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40" onClick={onClose}>
@@ -380,26 +374,18 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
           </div>
           <div className="p-4 space-y-3">
             {/* Amount section */}
+            {order.estimated > 0 && (
+              <div className="bg-[var(--bg)] rounded-md px-3 py-2 text-xs text-[var(--ink3)]">
+                套餐预计总价：¥{order.estimated.toLocaleString()} · 食材成本已按33%自动填入
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
-                <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">消费金额 *</span>
+                <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">实收金额 *</span>
                 <input type="number" min="0" value={billForm.total}
                   onChange={(e) => setBillForm((f) => ({ ...f, total: e.target.value }))}
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
-              </label>
-              <label className="block">
-                <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">折扣 (%) </span>
-                <input type="number" min="1" max="100" value={billForm.discount}
-                  onChange={(e) => setBillForm((f) => ({ ...f, discount: e.target.value }))}
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
-              </label>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">食材成本</span>
-                <input type="number" min="0" value={billForm.food_cost}
-                  onChange={(e) => setBillForm((f) => ({ ...f, food_cost: e.target.value }))}
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
+                  placeholder="账单上的最终金额"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" autoFocus />
               </label>
               <label className="block">
                 <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">收款方式</span>
@@ -410,29 +396,31 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
                 </select>
               </label>
             </div>
+            <label className="block">
+              <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">食材成本（默认套餐价×33%，可修改）</span>
+              <input type="number" min="0" value={billForm.food_cost}
+                onChange={(e) => setBillForm((f) => ({ ...f, food_cost: e.target.value }))}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
+            </label>
 
             {/* Summary */}
             <div className="bg-[var(--bg)] rounded-lg p-3 text-sm space-y-1">
               <div className="flex justify-between">
-                <span className="text-[var(--ink3)]">消费金额</span>
+                <span className="text-[var(--ink3)]">实收金额</span>
                 <span>¥{total.toLocaleString()}</span>
               </div>
-              {discount < 100 && (
-                <div className="flex justify-between">
-                  <span className="text-[var(--ink3)]">折后金额 ({discount}%)</span>
-                  <span>¥{discounted.toLocaleString()}</span>
-                </div>
-              )}
               {order.deposit > 0 && (
                 <div className="flex justify-between">
                   <span className="text-[var(--ink3)]">已收定金</span>
                   <span className="text-[var(--green)]">-¥{order.deposit.toLocaleString()}</span>
                 </div>
               )}
-              <div className="flex justify-between font-bold border-t border-[var(--border)] pt-1 mt-1">
-                <span>实收金额</span>
-                <span className="text-[var(--green)]">¥{Math.max(0, finalPaid).toLocaleString()}</span>
-              </div>
+              {order.deposit > 0 && (
+                <div className="flex justify-between font-bold border-t border-[var(--border)] pt-1 mt-1">
+                  <span>还需收款</span>
+                  <span className="text-[var(--green)]">¥{Math.max(0, finalPaid).toLocaleString()}</span>
+                </div>
+              )}
             </div>
 
             {/* Stored value warning */}
