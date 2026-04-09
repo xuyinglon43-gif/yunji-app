@@ -600,7 +600,7 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
             {order.status === '已确认' && (
               <button onClick={handleMarkPendingBill}
                 className="flex-1 py-2.5 text-sm bg-[#FF8C42] text-white rounded-lg hover:opacity-90 transition">
-                标记待结账
+                服务已结束
               </button>
             )}
             {order.status === '待结账' && (

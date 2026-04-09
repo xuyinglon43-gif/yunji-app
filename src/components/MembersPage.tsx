@@ -21,6 +21,33 @@ export default function MembersPage() {
   const [memberBills, setMemberBills] = useState<Bill[]>([]);
   const [rechargeAmount, setRechargeAmount] = useState('');
   const [bizSuggestions, setBizSuggestions] = useState<{ id: number; name: string; phone: string }[]>([]);
+  const [sortKey, setSortKey] = useState<string>('name');
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const toggleSort = (key: string) => {
+    if (sortKey === key) { setSortAsc(!sortAsc); } else { setSortKey(key); setSortAsc(key === 'name'); }
+  };
+
+  const sortedMembers = useMemo(() => {
+    const arr = [...members];
+    arr.sort((a, b) => {
+      let va: number | string = 0, vb: number | string = 0;
+      switch (sortKey) {
+        case 'name': va = a.name; vb = b.name; break;
+        case 'balance': va = a.balance; vb = b.balance; break;
+        case 'visits': va = a.visits; vb = b.visits; break;
+        case 'discount': va = a.discount ?? 999; vb = b.discount ?? 999; break;
+        case 'created_at': va = a.created_at; vb = b.created_at; break;
+        default: return 0;
+      }
+      if (va < vb) return sortAsc ? -1 : 1;
+      if (va > vb) return sortAsc ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [members, sortKey, sortAsc]);
+
+  const sortIcon = (key: string) => sortKey === key ? (sortAsc ? ' ↑' : ' ↓') : '';
 
   function emptyForm() {
     return { name: '', phone: '', level: '散客', discount: 100 as number | null, balance: 0, fee_expiry: '', old_debt: 0, biz_name: '', note: '', wine_balance: 0, venue_balance: 0, venue_discount: null as number | null, no_service_fee: false };
@@ -244,90 +271,77 @@ export default function MembersPage() {
         </div>
       </div>
 
-      {/* 沉睡会员提醒 */}
+      {/* 沉睡会员提醒（精简） */}
       {dormantMembers.length > 0 && (
-        <div className="mx-3 mt-3 p-3 bg-[#FFF3CD] border border-[#F0C040] rounded-lg">
-          <div className="text-xs font-semibold text-[#856404] mb-1">沉睡会员提醒 · {dormantMembers.length}位会员超过60天未到访</div>
-          <div className="flex flex-wrap gap-2">
-            {dormantMembers.slice(0, 10).map((m) => (
-              <button key={m.id} onClick={() => openProfile(m)}
-                className="text-[11px] px-2 py-1 bg-white border border-[#F0C040] rounded-full text-[#856404] hover:bg-[#FFF3CD] transition">
-                {m.name} · {m.level}
-              </button>
-            ))}
-            {dormantMembers.length > 10 && <span className="text-[11px] text-[#856404] py-1">等{dormantMembers.length}位...</span>}
-          </div>
+        <div className="mx-3 mt-3 px-3 py-2 bg-[#FFF3CD] border border-[#F0C040] rounded-lg flex items-center justify-between">
+          <span className="text-xs font-medium text-[#856404]">{dormantMembers.length}位会员超过60天未到访</span>
+          <button onClick={() => setLevelFilter('云集旧会员')} className="text-[11px] text-[#856404] hover:underline">查看</button>
         </div>
       )}
 
-      {/* Member grid */}
-      <div className="flex-1 overflow-y-auto p-3">
+      {/* 会员表格 */}
+      <div className="flex-1 overflow-auto p-3">
         {members.length === 0 && (
           <div className="text-center text-[var(--ink3)] py-12">暂无会员</div>
         )}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {members.map((m) => (
-            <div key={m.id}
-              className="bg-white rounded-lg p-3 border border-[var(--border)] cursor-pointer hover:shadow-sm transition"
-              onClick={() => openProfile(m)}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-semibold text-sm">{m.name}</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--purple-bg)] text-[var(--purple)] border border-[var(--purple-border)]">
-                    {m.level}
-                  </span>
-                  {m.source && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--bg)] text-[var(--ink3)]">
-                      {m.source}
-                    </span>
+        {members.length > 0 && (
+          <div className="bg-white rounded-lg border border-[var(--border)] overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[var(--bg)] text-xs text-[var(--ink3)]">
+                  <th className="text-left px-3 py-2 font-medium cursor-pointer hover:text-[var(--ink)] select-none" onClick={() => toggleSort('name')}>
+                    姓名{sortIcon('name')}
+                  </th>
+                  <th className="text-left px-3 py-2 font-medium">等级</th>
+                  <th className="text-left px-3 py-2 font-medium cursor-pointer hover:text-[var(--ink)] select-none" onClick={() => toggleSort('discount')}>
+                    折扣{sortIcon('discount')}
+                  </th>
+                  {canSeeFinancials && (
+                    <th className="text-right px-3 py-2 font-medium cursor-pointer hover:text-[var(--ink)] select-none" onClick={() => toggleSort('balance')}>
+                      储值余额{sortIcon('balance')}
+                    </th>
                   )}
-                  {m.no_service_fee && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--green-bg)] text-[var(--green)]">
-                      免服务费
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="text-xs text-[var(--ink3)] space-y-0.5">
-                <div className="flex justify-between">
-                  <span>{maskPhone(m.phone)}</span>
-                  <span>到访 {m.visits} 次</span>
-                </div>
-                {canSeeFinancials && (
-                  <>
-                    <div className="flex justify-between">
-                      <span>餐饮: {formatDiscount(m.discount)}</span>
-                      <span>储值: ¥{m.balance.toLocaleString()}</span>
-                    </div>
-                    {(m.wine_balance > 0 || m.venue_balance > 0) && (
-                      <div className="flex justify-between">
-                        {m.wine_balance > 0 && <span>红酒: ¥{m.wine_balance.toLocaleString()}</span>}
-                        {m.venue_balance > 0 && <span>场地: ¥{m.venue_balance.toLocaleString()}</span>}
-                      </div>
+                  <th className="text-right px-3 py-2 font-medium cursor-pointer hover:text-[var(--ink)] select-none" onClick={() => toggleSort('visits')}>
+                    到访{sortIcon('visits')}
+                  </th>
+                  <th className="text-right px-3 py-2 font-medium cursor-pointer hover:text-[var(--ink)] select-none" onClick={() => toggleSort('created_at')}>
+                    最近到访{sortIcon('created_at')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedMembers.map((m) => (
+                  <tr key={m.id}
+                    className="border-t border-[var(--border2)] cursor-pointer hover:bg-[var(--bg)] transition"
+                    onClick={() => openProfile(m)}>
+                    <td className="px-3 py-2.5">
+                      <span className="font-medium">{m.name}</span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--purple-bg)] text-[var(--purple)] border border-[var(--purple-border)]">
+                        {m.level}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-[var(--ink2)]">
+                      {formatDiscount(m.discount)}
+                    </td>
+                    {canSeeFinancials && (
+                      <td className={`px-3 py-2.5 text-right font-medium ${m.balance < 0 ? 'text-[var(--red)]' : ''}`}>
+                        ¥{m.balance.toLocaleString()}
+                      </td>
                     )}
-                    {m.venue_discount !== null && m.venue_discount !== undefined && (
-                      <span>场地折扣: {formatVenueDiscount(m.venue_discount)}</span>
-                    )}
-                    {m.old_debt > 0 && (
-                      <div className="text-[var(--amber)]">旧债: ¥{m.old_debt.toLocaleString()}</div>
-                    )}
-                  </>
-                )}
-                {m.biz_name && <div className="text-[var(--amber)]">商务: {m.biz_name}</div>}
-                {m.note && <div className="truncate text-[var(--ink3)]">{m.note}</div>}
-              </div>
-              {/* 快捷充值按钮 */}
-              {can('edit') && canSeeFinancials && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); openRecharge(m); }}
-                  className="mt-2 w-full text-[11px] py-1.5 rounded-md border border-[var(--green)] text-[var(--green)] hover:bg-[var(--green-bg)] transition"
-                >
-                  充值
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
+                    <td className="px-3 py-2.5 text-right text-[var(--ink3)]">
+                      {m.visits}次
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-[var(--ink3)] text-xs">
+                      -
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Create/Edit Modal */}
