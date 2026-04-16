@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { normalizeRow, normalizeRows } from '@/lib/money';
 import { useAuth } from '@/lib/auth';
 import { Bill, BusinessContact, BizSettlement, Order } from '@/lib/types';
 
@@ -104,7 +105,8 @@ export default function BusinessPage() {
       .gte('date', thisMonth + '-01').eq('confirmed', true).is('deleted_at', null);
     const mapBill = (b: Record<string, unknown>) => {
       const ord = b.orders as Record<string, string> | null;
-      return { ...b, order_client: ord?.client || '', order_type: ord?.type || '', order_date: ord?.date || '', biz_name: b.biz_name || ord?.biz_name || '' };
+      const nb = normalizeRow(b, 'bills') as Record<string, unknown>;
+      return { ...nb, order_client: ord?.client || '', order_type: ord?.type || '', order_date: ord?.date || '', biz_name: nb.biz_name || ord?.biz_name || '' };
     };
     setBills((mb || []).map(mapBill) as typeof bills);
 
@@ -119,7 +121,7 @@ export default function BusinessPage() {
 
     const { data: s } = await supabase
       .from('biz_settlements').select('*').order('settled_at', { ascending: false });
-    setSettlements(s || []);
+    setSettlements(normalizeRows(s, 'biz_settlements') as typeof settlements);
 
     // 加载关联商务的订单（用于显示预定数）
     const { data: mo } = await supabase
@@ -129,7 +131,7 @@ export default function BusinessPage() {
       .is('deleted_at', null)
       .neq('status', '已取消')
       .gte('date', thisMonth + '-01');
-    setBizOrders(mo || []);
+    setBizOrders(normalizeRows(mo, 'orders') as typeof bizOrders);
 
     const { data: ao } = await supabase
       .from('orders').select('*')
@@ -137,7 +139,7 @@ export default function BusinessPage() {
       .neq('biz_name', '')
       .is('deleted_at', null)
       .neq('status', '已取消');
-    setAllBizOrders(ao || []);
+    setAllBizOrders(normalizeRows(ao, 'orders') as typeof allBizOrders);
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -283,7 +285,7 @@ export default function BusinessPage() {
 
   const doSettle = async () => {
     if (!selectedContact) return;
-    const amount = parseInt(settleAmount) || 0;
+    const amount = parseFloat(settleAmount) || 0;
     if (amount <= 0) return alert('请填写结算金额');
     // 立即关闭弹窗
     setShowSettle(false);
@@ -572,7 +574,7 @@ export default function BusinessPage() {
                 <div className="text-sm text-[var(--ink3)]">未结算: ¥{(detailTotalCommission - detailTotalSettled).toLocaleString()}</div>
                 <label className="block">
                   <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">结算金额 *</span>
-                  <input type="number" min="0" value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)}
+                  <input type="number" min="0" step="0.01" inputMode="decimal" value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)}
                     className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm" />
                 </label>
                 <label className="block">

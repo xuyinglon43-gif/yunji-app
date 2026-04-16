@@ -6,6 +6,7 @@ import { Bill, Expense, Member, AuditLog, Order } from '@/lib/types';
 import { restoreRecord } from '@/lib/audit';
 import { useAuth } from '@/lib/auth';
 import { APP_VERSION, CHANGELOG } from '@/lib/changelog';
+import { normalizeRow, normalizeRows } from '@/lib/money';
 
 type Panel = 'dashboard' | 'audit' | 'deleted' | 'changelog';
 
@@ -42,7 +43,8 @@ export default function DashboardPage() {
       setBills(
         (b || []).map((bill: Record<string, unknown>) => {
           const ord = bill.orders as Record<string, string> | null;
-          return { ...bill, order_type: ord?.type || '', biz_name: bill.biz_name || ord?.biz_name || '' };
+          const nb = normalizeRow(bill, 'bills') as Record<string, unknown>;
+          return { ...nb, order_type: ord?.type || '', biz_name: nb.biz_name || ord?.biz_name || '' };
         }) as (Bill & { order_type?: string })[]
       );
 
@@ -50,10 +52,10 @@ export default function DashboardPage() {
         .from('expenses').select('*')
         .eq('status', '已审批').is('deleted_at', null)
         .gte('date', thisMonth + '-01');
-      setExpenses(e || []);
+      setExpenses(normalizeRows(e, 'expenses') as Expense[]);
 
       const { data: m } = await supabase.from('members').select('*').is('deleted_at', null);
-      setMembers(m || []);
+      setMembers(normalizeRows(m, 'members') as Member[]);
 
       const { count } = await supabase
         .from('orders').select('*', { count: 'exact', head: true })

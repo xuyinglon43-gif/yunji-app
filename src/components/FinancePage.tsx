@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { Bill, Expense, EXPENSE_CATEGORIES, ExpenseItem } from '@/lib/types';
+import { normalizeRow, normalizeRows } from '@/lib/money';
 
 // 收款方式颜色映射
 const METHOD_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
@@ -23,6 +24,7 @@ export default function FinancePage() {
   const [pendingExpenses, setPendingExpenses] = useState<Expense[]>([]);
   const [approvedExpenses, setApprovedExpenses] = useState<Expense[]>([]);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
   const [tab, setTab] = useState<'overview' | 'income' | 'expense'>('overview');
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState('');
@@ -66,7 +68,7 @@ export default function FinancePage() {
       .order('date', { ascending: false });
     setPendingBills(
       (pb || []).map((b: Record<string, unknown>) => ({
-        ...b,
+        ...normalizeRow(b, 'bills'),
         order_client: (b.orders as Record<string, string>)?.client || '',
       })) as (Bill & { order_client?: string })[]
     );
@@ -80,7 +82,7 @@ export default function FinancePage() {
       .order('date', { ascending: false });
     setConfirmedBills(
       (cb || []).map((b: Record<string, unknown>) => ({
-        ...b,
+        ...normalizeRow(b, 'bills'),
         order_client: (b.orders as Record<string, string>)?.client || '',
       })) as (Bill & { order_client?: string })[]
     );
@@ -91,7 +93,7 @@ export default function FinancePage() {
       .eq('status', '待审批')
       .is('deleted_at', null)
       .order('date', { ascending: false });
-    setPendingExpenses(pe || []);
+    setPendingExpenses(normalizeRows(pe, 'expenses') as Expense[]);
 
     const { data: ae } = await supabase
       .from('expenses')
@@ -100,7 +102,7 @@ export default function FinancePage() {
       .is('deleted_at', null)
       .gte('date', thisMonth + '-01')
       .order('date', { ascending: false });
-    setApprovedExpenses(ae || []);
+    setApprovedExpenses(normalizeRows(ae, 'expenses') as Expense[]);
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,25 +129,59 @@ export default function FinancePage() {
   };
 
   const submitExpense = async () => {
-    const amount = parseInt(expForm.amount) || 0;
+    const amount = parseFloat(expForm.amount) || 0;
     if (amount <= 0) return alert('请填写金额');
     if (!expForm.category) return alert('请选择类别');
+    const isEditing = editingExpenseId !== null;
+    const editId = editingExpenseId;
+    const savedItems = [...expItems];
     // 立即关闭弹窗
     setShowExpenseForm(false);
+    setEditingExpenseId(null);
     setExpForm({ date: new Date().toISOString().split('T')[0], category: '食材采购', amount: '', supplier: '', note: '' });
-    const savedItems = [...expItems];
     setExpItems([]);
     // 后台写入
-    supabase.from('expenses').insert({
-      date: expForm.date,
-      category: expForm.category,
-      amount,
-      supplier: expForm.supplier || null,
-      note: expForm.note || null,
-      items: savedItems.length > 0 ? savedItems : [],
-      submitted_by: roleLabel,
-      status: '待审批',
-    }).then(() => fetchData());
+    if (isEditing && editId !== null) {
+      supabase.from('expenses').update({
+        date: expForm.date,
+        category: expForm.category,
+        amount,
+        supplier: expForm.supplier || null,
+        note: expForm.note || null,
+        items: savedItems.length > 0 ? savedItems : [],
+      }).eq('id', editId).then(() => fetchData());
+    } else {
+      supabase.from('expenses').insert({
+        date: expForm.date,
+        category: expForm.category,
+        amount,
+        supplier: expForm.supplier || null,
+        note: expForm.note || null,
+        items: savedItems.length > 0 ? savedItems : [],
+        submitted_by: roleLabel,
+        status: '待审批',
+      }).then(() => fetchData());
+    }
+  };
+
+  const startEditExpense = (e: Expense) => {
+    setEditingExpenseId(e.id);
+    setExpForm({
+      date: e.date,
+      category: e.category,
+      amount: String(e.amount),
+      supplier: e.supplier || '',
+      note: e.note || '',
+    });
+    setExpItems(Array.isArray(e.items) ? [...e.items] : []);
+    setShowExpenseForm(true);
+  };
+
+  const closeExpenseForm = () => {
+    setShowExpenseForm(false);
+    setEditingExpenseId(null);
+    setExpForm({ date: new Date().toISOString().split('T')[0], category: '食材采购', amount: '', supplier: '', note: '' });
+    setExpItems([]);
   };
 
   const addExpenseItem = () => {
@@ -424,14 +460,20 @@ export default function FinancePage() {
                         ))}
                       </div>
                     )}
-                    {can('approve') && (
-                      <div className="flex gap-2 mt-2">
-                        <button onClick={() => approveExpense(e.id)}
-                          className="px-3 py-1 text-[11px] bg-[var(--green)] text-white rounded hover:opacity-90">批准</button>
-                        <button onClick={() => rejectExpense(e.id)}
-                          className="px-3 py-1 text-[11px] border border-[var(--red-border)] text-[var(--red)] rounded hover:bg-[var(--red-bg)]">驳回</button>
-                      </div>
-                    )}
+                    <div className="flex gap-2 mt-2">
+                      {can('edit') && (
+                        <button onClick={() => startEditExpense(e)}
+                          className="px-3 py-1 text-[11px] border border-[var(--border)] text-[var(--blue)] rounded hover:bg-[var(--bg)]">编辑</button>
+                      )}
+                      {can('approve') && (
+                        <>
+                          <button onClick={() => approveExpense(e.id)}
+                            className="px-3 py-1 text-[11px] bg-[var(--green)] text-white rounded hover:opacity-90">批准</button>
+                          <button onClick={() => rejectExpense(e.id)}
+                            className="px-3 py-1 text-[11px] border border-[var(--red-border)] text-[var(--red)] rounded hover:bg-[var(--red-bg)]">驳回</button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -461,11 +503,11 @@ export default function FinancePage() {
 
       {/* 提交支出 Modal */}
       {showExpenseForm && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40" onClick={() => setShowExpenseForm(false)}>
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40" onClick={closeExpenseForm}>
           <div className="bg-white w-full max-w-[480px] max-h-[90vh] rounded-t-xl md:rounded-xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
-              <h2 className="font-bold text-base">提交支出申请</h2>
-              <button onClick={() => setShowExpenseForm(false)} className="text-[var(--ink3)] text-lg">✕</button>
+              <h2 className="font-bold text-base">{editingExpenseId ? '编辑支出申请' : '提交支出申请'}</h2>
+              <button onClick={closeExpenseForm} className="text-[var(--ink3)] text-lg">✕</button>
             </div>
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -501,7 +543,7 @@ export default function FinancePage() {
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">金额 *</span>
-                  <input type="number" min="0" value={expForm.amount} onChange={(e) => setExpForm((f) => ({ ...f, amount: e.target.value }))}
+                  <input type="number" min="0" step="0.01" inputMode="decimal" value={expForm.amount} onChange={(e) => setExpForm((f) => ({ ...f, amount: e.target.value }))}
                     placeholder="支出金额"
                     className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
                 </label>
@@ -530,11 +572,11 @@ export default function FinancePage() {
                     <input type="text" placeholder="品名" value={item.name}
                       onChange={(e) => updateExpenseItem(idx, 'name', e.target.value)}
                       className="px-2 py-1 border border-[var(--border)] rounded text-xs" />
-                    <input type="number" placeholder="数量" min="0" value={item.qty || ''}
-                      onChange={(e) => updateExpenseItem(idx, 'qty', parseInt(e.target.value) || 0)}
+                    <input type="number" placeholder="数量" min="0" step="0.01" inputMode="decimal" value={item.qty || ''}
+                      onChange={(e) => updateExpenseItem(idx, 'qty', parseFloat(e.target.value) || 0)}
                       className="px-2 py-1 border border-[var(--border)] rounded text-xs" />
-                    <input type="number" placeholder="单价" min="0" value={item.price || ''}
-                      onChange={(e) => updateExpenseItem(idx, 'price', parseInt(e.target.value) || 0)}
+                    <input type="number" placeholder="单价" min="0" step="0.01" inputMode="decimal" value={item.price || ''}
+                      onChange={(e) => updateExpenseItem(idx, 'price', parseFloat(e.target.value) || 0)}
                       className="px-2 py-1 border border-[var(--border)] rounded text-xs" />
                     <button onClick={() => removeExpenseItem(idx)} className="text-[var(--red)] text-xs">删除</button>
                   </div>
@@ -543,9 +585,9 @@ export default function FinancePage() {
             </div>
             <div className="flex gap-3 px-4 py-3 border-t border-[var(--border)]">
               <button onClick={submitExpense} className="flex-1 py-2.5 text-sm bg-[var(--green)] text-white rounded-lg hover:opacity-90 transition">
-                提交申请
+                {editingExpenseId ? '保存修改' : '提交申请'}
               </button>
-              <button onClick={() => setShowExpenseForm(false)} className="flex-1 py-2.5 text-sm border border-[var(--border)] rounded-lg hover:bg-[var(--bg)] transition">取消
+              <button onClick={closeExpenseForm} className="flex-1 py-2.5 text-sm border border-[var(--border)] rounded-lg hover:bg-[var(--bg)] transition">取消
               </button>
             </div>
           </div>

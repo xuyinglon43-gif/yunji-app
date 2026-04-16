@@ -6,6 +6,7 @@ import { MEMBER_LEVELS, STATUS_COLORS, VENUES } from '@/lib/constants';
 import { useAuth } from '@/lib/auth';
 import { Member, DEFAULT_DISCOUNTS, Bill, Order, formatDiscount, formatVenueDiscount } from '@/lib/types';
 import { softDelete, hardDelete, writeAuditLog } from '@/lib/audit';
+import { normalizeRows, n } from '@/lib/money';
 
 type ModalMode = null | 'create' | 'edit' | 'profile' | 'recharge';
 
@@ -62,7 +63,7 @@ export default function MembersPage() {
       query = query.eq('level', levelFilter);
     }
     const { data } = await query.limit(200);
-    if (data) setMembers(data);
+    if (data) setMembers(normalizeRows(data, 'members') as Member[]);
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,8 +123,8 @@ export default function MembersPage() {
       supabase.from('orders').select('*').eq('member_id', m.id).is('deleted_at', null).order('date', { ascending: false }).limit(30),
       supabase.from('bills').select('*').eq('member_id', m.id).is('deleted_at', null).order('date', { ascending: false }).limit(30),
     ]);
-    setMemberOrders(ordersRes.data || []);
-    setMemberBills(billsRes.data || []);
+    setMemberOrders(normalizeRows(ordersRes.data, 'orders') as Order[]);
+    setMemberBills(normalizeRows(billsRes.data, 'bills') as Bill[]);
   };
 
   const openRecharge = (m: Member) => {
@@ -134,9 +135,9 @@ export default function MembersPage() {
 
   const handleRecharge = async () => {
     if (!selectedMember) return;
-    const amount = parseInt(rechargeAmount) || 0;
+    const amount = parseFloat(rechargeAmount) || 0;
     if (amount <= 0) return alert('请输入充值金额');
-    const newBalance = selectedMember.balance + amount;
+    const newBalance = n(selectedMember.balance) + amount;
     const memberId = selectedMember.id;
     const memberName = selectedMember.name;
     const oldBalance = selectedMember.balance;
@@ -382,7 +383,7 @@ export default function MembersPage() {
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">储值余额</span>
-                  <input type="number" min="0" value={form.balance} onChange={(e) => updateForm('balance', parseInt(e.target.value) || 0)}
+                  <input type="number" min="0" step="0.01" inputMode="decimal" value={form.balance} onChange={(e) => updateForm('balance', parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
                 </label>
                 <label className="block">
@@ -394,12 +395,12 @@ export default function MembersPage() {
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">红酒余额</span>
-                  <input type="number" value={form.wine_balance} onChange={(e) => updateForm('wine_balance', parseFloat(e.target.value) || 0)}
+                  <input type="number" step="0.01" inputMode="decimal" value={form.wine_balance} onChange={(e) => updateForm('wine_balance', parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
                 </label>
                 <label className="block">
                   <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">场地余额</span>
-                  <input type="number" value={form.venue_balance} onChange={(e) => updateForm('venue_balance', parseFloat(e.target.value) || 0)}
+                  <input type="number" step="0.01" inputMode="decimal" value={form.venue_balance} onChange={(e) => updateForm('venue_balance', parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
                 </label>
               </div>
@@ -427,7 +428,7 @@ export default function MembersPage() {
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">旧云集余额</span>
-                  <input type="number" min="0" value={form.old_debt} onChange={(e) => updateForm('old_debt', parseInt(e.target.value) || 0)}
+                  <input type="number" min="0" step="0.01" inputMode="decimal" value={form.old_debt} onChange={(e) => updateForm('old_debt', parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
                 </label>
                 <div className="relative">
@@ -480,14 +481,14 @@ export default function MembersPage() {
               </div>
               <label className="block">
                 <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">充值金额</span>
-                <input type="number" min="1" value={rechargeAmount}
+                <input type="number" min="0.01" step="0.01" inputMode="decimal" value={rechargeAmount}
                   onChange={(e) => setRechargeAmount(e.target.value)}
                   placeholder="请输入充值金额"
                   className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" autoFocus />
               </label>
-              {rechargeAmount && parseInt(rechargeAmount) > 0 && (
+              {rechargeAmount && parseFloat(rechargeAmount) > 0 && (
                 <div className="text-xs text-[var(--ink3)]">
-                  充值后余额：¥{(selectedMember.balance + (parseInt(rechargeAmount) || 0)).toLocaleString()}
+                  充值后余额：¥{(n(selectedMember.balance) + (parseFloat(rechargeAmount) || 0)).toLocaleString()}
                 </div>
               )}
             </div>

@@ -6,6 +6,7 @@ import { VENUES, STATUS_COLORS, ORDER_TYPES, ACTIONS, MEMBER_LEVELS, ALL_SLOTS }
 import { useAuth } from '@/lib/auth';
 import { Order, Bill, Member, DEFAULT_DISCOUNTS, PAYMENT_METHODS } from '@/lib/types';
 import { softDelete, hardDelete, writeAuditLog } from '@/lib/audit';
+import { normalizeRow } from '@/lib/money';
 
 interface Props {
   orderId: number;
@@ -43,7 +44,7 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
   const loadOrder = async () => {
     const { data } = await supabase.from('orders').select('*').eq('id', orderId).single();
     if (!data) return;
-    setOrder(data);
+    setOrder(normalizeRow(data, 'orders'));
 
     // Load bill if paid/settled
     if (data.status === '已收款' || data.status === '已入账') {
@@ -52,7 +53,7 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
         .select('*')
         .eq('order_id', orderId)
         .single();
-      if (billData) setBill(billData);
+      if (billData) setBill(normalizeRow(billData, 'bills'));
     }
 
     // Load member if linked
@@ -62,7 +63,7 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
         .select('*')
         .eq('id', data.member_id)
         .single();
-      if (memberData) setMember(memberData);
+      if (memberData) setMember(normalizeRow(memberData, 'members'));
     }
   };
 
@@ -166,8 +167,8 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
   };
 
   const saveBill = async () => {
-    const total = parseInt(billForm.total) || 0;
-    const food_cost = parseInt(billForm.food_cost) || 0;
+    const total = parseFloat(billForm.total) || 0;
+    const food_cost = parseFloat(billForm.food_cost) || 0;
     const paid = total - (order.deposit || 0);
 
     if (total <= 0) return alert('请填写实收金额');
@@ -205,7 +206,7 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
       if (billForm.method === '储值扣减') {
         biz_commission = 0; // No commission on stored value consumption
       } else {
-        biz_commission = Math.round(paid * 0.08); // 8% on dining
+        biz_commission = Math.round(paid * 0.08 * 100) / 100; // 8% on dining, keep 2 decimals
       }
     }
 
@@ -325,7 +326,7 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
               </label>
               <label className="block">
                 <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">定金</span>
-                <input type="number" min="0" value={editForm.deposit ?? ''} onChange={(e) => updateEdit('deposit', parseInt(e.target.value) || 0)}
+                <input type="number" min="0" step="0.01" inputMode="decimal" value={editForm.deposit ?? ''} onChange={(e) => updateEdit('deposit', parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
               </label>
             </div>
@@ -382,7 +383,7 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">实收金额 *</span>
-                <input type="number" min="0" value={billForm.total}
+                <input type="number" min="0" step="0.01" inputMode="decimal" value={billForm.total}
                   onChange={(e) => setBillForm((f) => ({ ...f, total: e.target.value }))}
                   placeholder="账单上的最终金额"
                   className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" autoFocus />
@@ -398,7 +399,7 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
             </div>
             <label className="block">
               <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">食材成本（默认套餐价×33%，可修改）</span>
-              <input type="number" min="0" value={billForm.food_cost}
+              <input type="number" min="0" step="0.01" inputMode="decimal" value={billForm.food_cost}
                 onChange={(e) => setBillForm((f) => ({ ...f, food_cost: e.target.value }))}
                 className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
             </label>

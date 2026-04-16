@@ -1,4 +1,4 @@
-export const APP_VERSION = 'v2.1';
+export const APP_VERSION = 'v2.2';
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: 'v2.2',
+    date: '2026-04-16',
+    changes: [
+      '财务"待审批"支出可编辑修改（需先执行SQL迁移 migrate_v2.2_decimal_money.sql）',
+      '所有金额字段支持两位小数录入（定金/实收/食材成本/支出/充值/结算等）',
+      '档期页面同一房间同时段支持录入多笔订单（紧凑视图显示×N角标，弹窗可"+再加一单"）',
+    ],
+  },
   {
     version: 'v2.1',
     date: '2026-04-09',

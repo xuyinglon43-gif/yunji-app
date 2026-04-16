@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { VENUES, STATUS_COLORS, ORDER_TYPES } from '@/lib/constants';
 import { useAuth } from '@/lib/auth';
 import { Order } from '@/lib/types';
+import { normalizeRows } from '@/lib/money';
 import OrderDetailModal from './OrderDetailModal';
 
 const STATUSES = ['全部', '待确认', '已确认', '待结账', '已收款', '已入账', '已取消'];
@@ -45,7 +46,7 @@ export default function OrdersPage() {
     if (statusFilter !== '全部') query = query.eq('status', statusFilter);
     if (typeFilter !== '全部') query = query.eq('type', typeFilter);
     const { data } = await query.limit(200);
-    if (data) setOrders(data);
+    if (data) setOrders(normalizeRows(data, 'orders') as Order[]);
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps

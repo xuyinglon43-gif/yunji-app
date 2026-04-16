@@ -111,7 +111,7 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
     if (!form.client.trim()) return alert('请填写客户姓名');
     if (!form.pax || parseInt(form.pax) < 1) return alert('请填写人数');
 
-    const deposit = parseInt(form.deposit) || 0;
+    const deposit = parseFloat(form.deposit) || 0;
     const pax = parseInt(form.pax);
     const discount = DEFAULT_DISCOUNTS[form.member_level] || 100;
     const estimated = Math.round(pax * 1000 * (discount / 100));
@@ -286,6 +286,8 @@ export default function NewOrderModal({ date, slot, venueId, onClose, onSaved }:
               <input
                 type="number"
                 min="0"
+                step="0.01"
+                inputMode="decimal"
                 value={form.deposit}
                 onChange={(e) => update('deposit', e.target.value)}
                 placeholder="0"

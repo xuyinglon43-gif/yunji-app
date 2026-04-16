@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { VENUES, ALL_SLOTS } from '@/lib/constants';
+import { normalizeRows } from '@/lib/money';
 import NewOrderModal from './NewOrderModal';
 import OrderDetailModal from './OrderDetailModal';
 
@@ -103,22 +104,27 @@ export default function Schedule() {
       .lte('date', to)
       .neq('status', '已取消')
       .is('deleted_at', null);
-    if (data) setOrders(data);
+    if (data) setOrders(normalizeRows(data, 'orders') as Order[]);
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchOrders(); }, [startDate, range]);
 
-  // Build lookup: date+slot+venueId -> order
+  // Build lookup: date+slot+venueId -> order list (允许同时段多单)
   const orderMap = useMemo(() => {
-    const map = new Map<string, Order>();
+    const map = new Map<string, Order[]>();
     for (const o of orders) {
       if (o.venues) {
         for (const v of o.venues) {
-          map.set(`${o.date}|${o.slot}|${v}`, o);
+          const key = `${o.date}|${o.slot}|${v}`;
+          const arr = map.get(key) || [];
+          arr.push(o);
+          map.set(key, arr);
         }
       }
     }
+    // 同时段内按 id 排序稳定
+    map.forEach((arr) => arr.sort((a, b) => a.id - b.id));
     return map;
   }, [orders]);
 
@@ -126,7 +132,7 @@ export default function Schedule() {
   const getVenueDateOrders = useCallback((venueId: string, date: string) => {
     return ALL_SLOTS.map((slot) => ({
       slot,
-      order: orderMap.get(`${date}|${slot}|${venueId}`) || null,
+      orders: orderMap.get(`${date}|${slot}|${venueId}`) || [],
     }));
   }, [orderMap]);
 
@@ -161,7 +167,7 @@ export default function Schedule() {
 
   const handleCellClick = (venueId: string, date: string, e: React.MouseEvent) => {
     const slotOrders = getVenueDateOrders(venueId, date);
-    const hasAny = slotOrders.some((s) => s.order);
+    const hasAny = slotOrders.some((s) => s.orders.length > 0);
 
     if (!hasAny) {
       // All slots empty — go straight to new order (default: 午餐)
@@ -184,7 +190,7 @@ export default function Schedule() {
   // Popover content
   const popoverOrders = popover ? getVenueDateOrders(popover.venueId, popover.date) : [];
   const popoverVenue = popover ? VENUES.find((v) => v.id === popover.venueId) : null;
-  const popoverHasOrders = popoverOrders.some((s) => s.order);
+  const popoverHasOrders = popoverOrders.some((s) => s.orders.length > 0);
 
   return (
     <div className="flex flex-col h-full">
@@ -295,53 +301,54 @@ export default function Schedule() {
                       onClick={(e) => !isExpanded && handleCellClick(venue.id, ds, e)}
                     >
                       {isExpanded ? (
-                        /* 3天展开视图：每个时段独立卡片 */
+                        /* 3天展开视图：每个时段独立卡片，同时段可并列多张 */
                         <div className="flex flex-col gap-1 p-1">
-                          {slotOrders.map(({ slot, order }) => {
-                            const colors = order ? BAND_COLORS[order.status] : null;
-                            if (!order) return null;
-                            return (
-                              <div
-                                key={slot}
-                                className="rounded-md px-2 py-1.5 cursor-pointer hover:opacity-80 transition"
-                                style={{
-                                  backgroundColor: colors!.bg,
-                                  border: `1.5px solid ${colors!.border}`,
-                                }}
-                                onClick={() => setSelectedOrderId(order.id)}
-                              >
-                                <div className="flex items-center justify-between gap-1">
-                                  <span className="text-sm font-semibold truncate" style={{ color: BAND_TEXT_COLORS[order.status] }}>
-                                    {order.client}
-                                  </span>
-                                  <span
-                                    className="text-[9px] px-1.5 py-0.5 rounded-full whitespace-nowrap font-medium"
-                                    style={{
-                                      backgroundColor: colors!.border + '30',
-                                      color: BAND_TEXT_COLORS[order.status],
-                                    }}
-                                  >
-                                    {order.status}
-                                  </span>
-                                </div>
-                                <div className="text-xs mt-0.5" style={{ color: BAND_TEXT_COLORS[order.status] }}>
-                                  {slot} · {order.pax}人 · {order.type}
-                                </div>
-                                {order.biz_name && (
-                                  <div className="text-[10px] mt-0.5 text-[var(--ink3)]">
-                                    商务：{order.biz_name}
+                          {slotOrders.map(({ slot, orders: slotList }) =>
+                            slotList.map((order) => {
+                              const colors = BAND_COLORS[order.status];
+                              return (
+                                <div
+                                  key={order.id}
+                                  className="rounded-md px-2 py-1.5 cursor-pointer hover:opacity-80 transition"
+                                  style={{
+                                    backgroundColor: colors.bg,
+                                    border: `1.5px solid ${colors.border}`,
+                                  }}
+                                  onClick={() => setSelectedOrderId(order.id)}
+                                >
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="text-sm font-semibold truncate" style={{ color: BAND_TEXT_COLORS[order.status] }}>
+                                      {order.client}
+                                    </span>
+                                    <span
+                                      className="text-[9px] px-1.5 py-0.5 rounded-full whitespace-nowrap font-medium"
+                                      style={{
+                                        backgroundColor: colors.border + '30',
+                                        color: BAND_TEXT_COLORS[order.status],
+                                      }}
+                                    >
+                                      {order.status}
+                                    </span>
                                   </div>
-                                )}
-                                {order.note && (
-                                  <div className="text-[10px] mt-0.5 text-[var(--amber)] truncate">
-                                    {order.note}
+                                  <div className="text-xs mt-0.5" style={{ color: BAND_TEXT_COLORS[order.status] }}>
+                                    {slot} · {order.pax}人 · {order.type}
                                   </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                                  {order.biz_name && (
+                                    <div className="text-[10px] mt-0.5 text-[var(--ink3)]">
+                                      商务：{order.biz_name}
+                                    </div>
+                                  )}
+                                  {order.note && (
+                                    <div className="text-[10px] mt-0.5 text-[var(--amber)] truncate">
+                                      {order.note}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })
+                          )}
                           {/* 空白格子点击可新建 */}
-                          {slotOrders.every(({ order }) => !order) && (
+                          {slotOrders.every(({ orders: slotList }) => slotList.length === 0) && (
                             <div
                               className="flex-1 min-h-[40px] cursor-pointer"
                               onClick={() => setNewOrderInfo({ date: ds, slot: '午餐', venueId: venue.id })}
@@ -349,25 +356,52 @@ export default function Schedule() {
                           )}
                         </div>
                       ) : (
-                        /* 7/14/30天紧凑视图：色带模式 */
+                        /* 7/14/30天紧凑视图：色带模式，同时段多单时色带分段并加角标 */
                         <div className="flex flex-col gap-px" style={{ minHeight: isCompact ? 40 : 56 }}>
-                          {slotOrders.map(({ slot, order }) => {
-                            const colors = order ? BAND_COLORS[order.status] : null;
+                          {slotOrders.map(({ slot, orders: slotList }) => {
+                            if (slotList.length === 0) {
+                              return (
+                                <div
+                                  key={slot}
+                                  className="flex-1 rounded-sm overflow-hidden flex items-center"
+                                  style={{ minHeight: isCompact ? 6 : 9 }}
+                                />
+                              );
+                            }
                             return (
                               <div
                                 key={slot}
-                                className="flex-1 rounded-sm overflow-hidden flex items-center"
-                                style={
-                                  colors
-                                    ? { backgroundColor: colors.bg, border: `1px solid ${colors.border}`, minHeight: isCompact ? 6 : 9 }
-                                    : { minHeight: isCompact ? 6 : 9 }
-                                }
+                                className="flex-1 rounded-sm overflow-hidden flex items-stretch relative"
+                                style={{ minHeight: isCompact ? 6 : 9 }}
                               >
-                                {!isCompact && order && (
-                                  <div className="flex items-center gap-1 px-1 w-full" style={{ color: BAND_TEXT_COLORS[order.status] }}>
-                                    <span className="text-[9px] font-medium truncate">{order.client.slice(0, 3)}</span>
-                                    <span className="text-[8px]">{order.pax}人</span>
-                                  </div>
+                                {slotList.map((order, i) => {
+                                  const colors = BAND_COLORS[order.status];
+                                  return (
+                                    <div
+                                      key={order.id}
+                                      className={`flex-1 overflow-hidden flex items-center ${i > 0 ? 'border-l border-white' : ''}`}
+                                      style={{
+                                        backgroundColor: colors.bg,
+                                        border: `1px solid ${colors.border}`,
+                                        borderLeft: i > 0 ? `2px solid #fff` : `1px solid ${colors.border}`,
+                                      }}
+                                    >
+                                      {!isCompact && (
+                                        <div className="flex items-center gap-1 px-1 w-full" style={{ color: BAND_TEXT_COLORS[order.status] }}>
+                                          <span className="text-[9px] font-medium truncate">{order.client.slice(0, slotList.length > 1 ? 2 : 3)}</span>
+                                          {slotList.length === 1 && <span className="text-[8px]">{order.pax}人</span>}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                {slotList.length > 1 && (
+                                  <span
+                                    className="absolute top-0 right-0 text-[8px] px-1 leading-none bg-white/80 rounded-bl"
+                                    style={{ color: BAND_TEXT_COLORS[slotList[0].status] }}
+                                  >
+                                    ×{slotList.length}
+                                  </span>
                                 )}
                               </div>
                             );
@@ -400,52 +434,77 @@ export default function Schedule() {
             </div>
           ) : (
             <div className="divide-y divide-[var(--border2)]">
-              {popoverOrders.map(({ slot, order }) => (
-                <div
-                  key={slot}
-                  className="px-3 py-2 hover:bg-[var(--bg)] cursor-pointer transition"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (order) {
-                      setSelectedOrderId(order.id);
-                      setPopover(null);
-                    } else {
-                      setNewOrderInfo({ date: popover.date, slot, venueId: popover.venueId });
-                      setPopover(null);
-                    }
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-[var(--ink3)] w-10">{slot}</span>
-                    {order ? (
-                      <div className="flex-1 ml-2">
-                        <div className="flex items-center gap-1">
-                          <span className="text-sm font-medium">{order.client}</span>
-                          <span
-                            className="text-[9px] px-1.5 py-0.5 rounded-full"
-                            style={{
-                              backgroundColor: BAND_COLORS[order.status]?.bg,
-                              color: BAND_TEXT_COLORS[order.status],
-                              border: `1px solid ${BAND_COLORS[order.status]?.border}`,
-                            }}
-                          >
-                            {order.status}
-                          </span>
-                        </div>
-                        <div className="text-xs text-[var(--ink3)]">
-                          {order.pax}人 · {order.action}
-                          {order.member_level !== '散客' && ` · ${order.member_level}`}
-                        </div>
-                        {order.note && (
-                          <div className="text-[10px] text-[var(--amber)] truncate">{order.note}</div>
-                        )}
+              {popoverOrders.map(({ slot, orders: slotList }) => {
+                if (slotList.length === 0) {
+                  return (
+                    <div
+                      key={slot}
+                      className="px-3 py-2 hover:bg-[var(--bg)] cursor-pointer transition"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNewOrderInfo({ date: popover.date, slot, venueId: popover.venueId });
+                        setPopover(null);
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-[var(--ink3)] w-10">{slot}</span>
+                        <span className="flex-1 ml-2 text-xs text-[var(--ink3)]">空闲 — 点击新建</span>
                       </div>
-                    ) : (
-                      <span className="flex-1 ml-2 text-xs text-[var(--ink3)]">空闲 — 点击新建</span>
-                    )}
+                    </div>
+                  );
+                }
+                return (
+                  <div key={slot} className="px-3 py-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-[var(--ink3)]">{slot}</span>
+                      <button
+                        className="text-[10px] text-[var(--green)] hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNewOrderInfo({ date: popover.date, slot, venueId: popover.venueId });
+                          setPopover(null);
+                        }}
+                      >
+                        + 再加一单
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      {slotList.map((order) => (
+                        <div
+                          key={order.id}
+                          className="rounded-md px-2 py-1 cursor-pointer hover:bg-[var(--bg)] transition"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedOrderId(order.id);
+                            setPopover(null);
+                          }}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm font-medium">{order.client}</span>
+                            <span
+                              className="text-[9px] px-1.5 py-0.5 rounded-full"
+                              style={{
+                                backgroundColor: BAND_COLORS[order.status]?.bg,
+                                color: BAND_TEXT_COLORS[order.status],
+                                border: `1px solid ${BAND_COLORS[order.status]?.border}`,
+                              }}
+                            >
+                              {order.status}
+                            </span>
+                          </div>
+                          <div className="text-xs text-[var(--ink3)]">
+                            {order.pax}人 · {order.action}
+                            {order.member_level !== '散客' && ` · ${order.member_level}`}
+                          </div>
+                          {order.note && (
+                            <div className="text-[10px] text-[var(--amber)] truncate">{order.note}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
