@@ -348,11 +348,22 @@ export default function Schedule() {
                             })
                           )}
                           {/* 空白格子点击可新建 */}
-                          {slotOrders.every(({ orders: slotList }) => slotList.length === 0) && (
+                          {slotOrders.every(({ orders: slotList }) => slotList.length === 0) ? (
                             <div
                               className="flex-1 min-h-[40px] cursor-pointer"
                               onClick={() => setNewOrderInfo({ date: ds, slot: '午餐', venueId: venue.id })}
                             />
+                          ) : (
+                            /* 已有订单：底部显示"+ 新建预定"入口 */
+                            <button
+                              className="mt-0.5 py-1 text-[11px] text-[var(--green)] border border-dashed border-[var(--green)]/40 rounded hover:bg-[var(--green-bg)] transition"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setNewOrderInfo({ date: ds, slot: '午餐', venueId: venue.id });
+                              }}
+                            >
+                              + 新建预定
+                            </button>
                           )}
                         </div>
                       ) : (
