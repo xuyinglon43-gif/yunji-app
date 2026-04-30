@@ -30,6 +30,7 @@ export default function FinancePage() {
   const [newCategory, setNewCategory] = useState('');
   const [expForm, setExpForm] = useState({
     date: new Date().toISOString().split('T')[0],
+    period: new Date().toISOString().slice(0, 7),
     category: '食材采购',
     amount: '',
     supplier: '',
@@ -138,12 +139,13 @@ export default function FinancePage() {
     // 立即关闭弹窗
     setShowExpenseForm(false);
     setEditingExpenseId(null);
-    setExpForm({ date: new Date().toISOString().split('T')[0], category: '食材采购', amount: '', supplier: '', note: '' });
+    setExpForm({ date: new Date().toISOString().split('T')[0], period: new Date().toISOString().slice(0, 7), category: '食材采购', amount: '', supplier: '', note: '' });
     setExpItems([]);
     // 后台写入
     if (isEditing && editId !== null) {
       supabase.from('expenses').update({
         date: expForm.date,
+        period: expForm.period,
         category: expForm.category,
         amount,
         supplier: expForm.supplier || null,
@@ -153,6 +155,7 @@ export default function FinancePage() {
     } else {
       supabase.from('expenses').insert({
         date: expForm.date,
+        period: expForm.period,
         category: expForm.category,
         amount,
         supplier: expForm.supplier || null,
@@ -168,6 +171,7 @@ export default function FinancePage() {
     setEditingExpenseId(e.id);
     setExpForm({
       date: e.date,
+      period: e.period || e.date.slice(0, 7),
       category: e.category,
       amount: String(e.amount),
       supplier: e.supplier || '',
@@ -180,7 +184,7 @@ export default function FinancePage() {
   const closeExpenseForm = () => {
     setShowExpenseForm(false);
     setEditingExpenseId(null);
-    setExpForm({ date: new Date().toISOString().split('T')[0], category: '食材采购', amount: '', supplier: '', note: '' });
+    setExpForm({ date: new Date().toISOString().split('T')[0], period: new Date().toISOString().slice(0, 7), category: '食材采购', amount: '', supplier: '', note: '' });
     setExpItems([]);
   };
 
@@ -199,7 +203,16 @@ export default function FinancePage() {
   const totalPendingIncome = pendingBills.reduce((s, b) => s + b.paid, 0);
   const totalConfirmedIncome = confirmedBills.reduce((s, b) => s + b.paid, 0);
   const totalPendingExpense = pendingExpenses.reduce((s, e) => s + e.amount, 0);
-  const totalApprovedExpense = approvedExpenses.reduce((s, e) => s + e.amount, 0);
+
+  // 按归属月筛选已审批支出（period 为空时回退到支付日期的月份）
+  const thisMonthApproved = approvedExpenses.filter(
+    (e) => (e.period || e.date.slice(0, 7)) === thisMonth
+  );
+  // 资金退还单独处理：从收入中扣减，不计入经营支出
+  const refundExpenses = thisMonthApproved.filter((e) => e.category === '资金退还');
+  const realExpenses = thisMonthApproved.filter((e) => e.category !== '资金退还');
+  const totalRefunds = refundExpenses.reduce((s, e) => s + e.amount, 0);
+  const totalApprovedExpense = realExpenses.reduce((s, e) => s + e.amount, 0);
 
   // 收款方式分布
   const methodBreakdown = useMemo(() => {
@@ -228,14 +241,14 @@ export default function FinancePage() {
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
   }, [confirmedBills, approvedExpenses]);
 
-  // 支出分类汇总
+  // 支出分类汇总（仅本月归属、排除资金退还）
   const expenseByCat = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const e of approvedExpenses) {
+    for (const e of realExpenses) {
       map[e.category] = (map[e.category] || 0) + e.amount;
     }
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
-  }, [approvedExpenses]);
+  }, [realExpenses]);
 
   return (
     <div className="flex flex-col h-full">
@@ -279,18 +292,30 @@ export default function FinancePage() {
               <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
                 <div className="text-[10px] text-[var(--ink3)]">本月已入账</div>
                 <div className="text-lg font-bold text-[var(--green)]">¥{totalConfirmedIncome.toLocaleString()}</div>
+                {totalRefunds > 0 && (
+                  <div className="text-[10px] text-[var(--red)] mt-0.5">退款 -¥{totalRefunds.toLocaleString()}</div>
+                )}
               </div>
               <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
                 <div className="text-[10px] text-[var(--ink3)]">待入账</div>
                 <div className="text-lg font-bold text-[var(--amber)]">¥{totalPendingIncome.toLocaleString()}</div>
               </div>
               <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
-                <div className="text-[10px] text-[var(--ink3)]">本月已审批支出</div>
+                <div className="text-[10px] text-[var(--ink3)]">本月经营支出</div>
                 <div className="text-lg font-bold text-[var(--red)]">¥{totalApprovedExpense.toLocaleString()}</div>
+                <div className="text-[10px] text-[var(--ink3)] mt-0.5">按归属月计算</div>
               </div>
               <div className="bg-white rounded-lg p-3 border border-[var(--border)]">
                 <div className="text-[10px] text-[var(--ink3)]">本月净收入</div>
-                <div className="text-lg font-bold">{(totalConfirmedIncome - totalApprovedExpense) >= 0 ? '' : '-'}¥{Math.abs(totalConfirmedIncome - totalApprovedExpense).toLocaleString()}</div>
+                {(() => {
+                  const net = totalConfirmedIncome - totalRefunds - totalApprovedExpense;
+                  return (
+                    <div className={`text-lg font-bold ${net >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
+                      {net >= 0 ? '' : '-'}¥{Math.abs(net).toLocaleString()}
+                    </div>
+                  );
+                })()}
+                <div className="text-[10px] text-[var(--ink3)] mt-0.5">已入账-退款-支出</div>
               </div>
             </div>
 
@@ -512,7 +537,7 @@ export default function FinancePage() {
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">日期</span>
+                  <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">支付日期</span>
                   <input type="date" value={expForm.date} onChange={(e) => setExpForm((f) => ({ ...f, date: e.target.value }))}
                     className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
                 </label>
@@ -540,6 +565,17 @@ export default function FinancePage() {
                   </div>
                 </div>
               </div>
+              {/* 归属月份：工资/社保类才显示，提示财务是否跨月 */}
+              {(expForm.category === '工资薪资' || expForm.category === '社保公积金') && (
+                <label className="block">
+                  <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">
+                    归属月份
+                    <span className="ml-1 font-normal text-[var(--ink3)]">（这笔钱算哪个月的成本？）</span>
+                  </span>
+                  <input type="month" value={expForm.period} onChange={(e) => setExpForm((f) => ({ ...f, period: e.target.value }))}
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
+                </label>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">金额 *</span>

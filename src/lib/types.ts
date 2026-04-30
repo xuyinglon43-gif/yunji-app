@@ -74,6 +74,7 @@ export interface Member {
 export interface Expense {
   id: number;
   date: string;
+  period: string;      // 归属月份 YYYY-MM，用于 P&L 计算
   category: string;
   amount: number;
   supplier: string;
