@@ -15,6 +15,10 @@ const NAV_ITEMS = [
   { id: 'members', label: '会员', icon: '●' },
   { id: 'business', label: '商务', icon: '★' },
   { id: 'dashboard', label: '总览', icon: '◼' },
+  { id: 'analytics', label: '分析', icon: '◐' },
+  { id: 'shareholder', label: '股东', icon: '☯' },
+  { id: 'audit', label: '审计', icon: '☢' },
+  { id: 'settings', label: '设置', icon: '⚙' },
 ];
 
 export default function Navigation({ currentPage, onNavigate }: NavigationProps) {
@@ -50,10 +54,12 @@ export default function Navigation({ currentPage, onNavigate }: NavigationProps)
             <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium
               ${role === 'approve'
                 ? 'bg-[var(--green-bg)] text-[var(--green)] border border-[var(--green-border)]'
-                : role === 'finance'
+                : role === 'manager'
                 ? 'bg-[var(--blue-bg)] text-[var(--blue)] border border-[var(--blue-border)]'
-                : role === 'service'
+                : role === 'finance'
                 ? 'bg-[var(--purple-bg)] text-[var(--purple)] border border-[var(--purple-border)]'
+                : role === 'service'
+                ? 'bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber-border)]'
                 : 'bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber-border)]'
               }`}
             >

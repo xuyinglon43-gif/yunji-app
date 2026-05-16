@@ -11,6 +11,10 @@ import FinancePage from '@/components/FinancePage';
 import BusinessPage from '@/components/BusinessPage';
 import HomePage from '@/components/HomePage';
 import DashboardPage from '@/components/DashboardPage';
+import AnalyticsPage from '@/components/AnalyticsPage';
+import AuditPage from '@/components/AuditPage';
+import ShareholderPage from '@/components/ShareholderPage';
+import SettingsPage from '@/components/SettingsPage';
 
 export default function Home() {
   const { role, logout } = useAuth();
@@ -33,6 +37,10 @@ export default function Home() {
       case 'members': return <MembersPage />;
       case 'business': return <BusinessPage />;
       case 'dashboard': return <DashboardPage />;
+      case 'analytics': return <AnalyticsPage />;
+      case 'audit': return <AuditPage />;
+      case 'shareholder': return <ShareholderPage />;
+      case 'settings': return <SettingsPage />;
       default: return <Schedule />;
     }
   };
