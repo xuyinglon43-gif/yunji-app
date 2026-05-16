@@ -1,8 +1,9 @@
-export type Role = 'approve' | 'finance' | 'service' | 'view';
+export type Role = 'approve' | 'manager' | 'finance' | 'service' | 'view';
 
 export const PASSWORDS: Record<string, Role> = {
   zhangze123: 'approve',
   '8888': 'approve',
+  renzhuan7777: 'manager',
   '666': 'service',
   '16586666': 'finance',
   '1658666': 'view',
@@ -13,17 +14,61 @@ export const HARD_DELETE_PASSWORDS = new Set(['8888', 'zhangze123']);
 
 export const ROLE_LABELS: Record<Role, string> = {
   approve: '老板',
+  manager: '总经理',
   finance: '财务(录入)',
   service: '客服(录入)',
   view: '云吉员工',
 };
 
-// Per-role visible page IDs
+// 业务页面：总经理与老板可见相同（含 dashboard/analytics）。
+// 老板还独享 audit/shareholder/settings 三个治理页面。
 export const ROLE_PAGES: Record<Role, string[]> = {
-  approve: ['home', 'schedule', 'orders', 'finance', 'members', 'business', 'dashboard'],
+  approve: ['home', 'schedule', 'orders', 'finance', 'members', 'business', 'dashboard', 'analytics', 'audit', 'shareholder', 'settings'],
+  manager: ['home', 'schedule', 'orders', 'finance', 'members', 'business', 'dashboard', 'analytics'],
   finance: ['home', 'schedule', 'orders', 'finance', 'members', 'business'],
   service: ['home', 'schedule', 'orders', 'members'],
   view:    ['home', 'schedule', 'orders', 'members'],
+};
+
+// 权限动作清单（按"治理 vs 经营"二分）
+export type PermAction =
+  // 经营性（manager + approve + 其他录入角色）
+  | 'create'              // 新增任何记录
+  | 'edit_open'           // 修改"未确认/未结算"状态的记录
+  | 'edit_nondefining'    // 修改非定性字段（联系方式/备注/客户名等）
+  | 'cancel_booking'      // 业务状态变更：取消预定
+  | 'undo_self_recent'    // 30 分钟内撤回自己创建的记录
+  | 'export'              // 导出 PDF / Excel
+  // 治理性（只有 approve）
+  | 'delete_soft'         // 软删除
+  | 'delete_hard'         // 硬删除（破坏性）
+  | 'undo_confirmed'      // 撤销已确认/已收款/已结算状态
+  | 'edit_confirmed_money'// 修改已确认账单的金额、食材成本
+  | 'restore'             // 恢复已软删除记录
+  | 'settle_commission'   // 结算商务佣金
+  | 'view_full_phone'     // 看完整手机号
+  | 'manage_roles'        // 增减账号/改密码（settings 页）
+  | 'edit_shareholder'    // 录入/修改股东事项
+  | 'view_audit';         // 查看审计日志
+
+// 权限矩阵：每个角色拥有的动作权限
+export const ROLE_PERMS: Record<Role, PermAction[]> = {
+  approve: [
+    'create', 'edit_open', 'edit_nondefining', 'cancel_booking', 'undo_self_recent', 'export',
+    'delete_soft', 'delete_hard', 'undo_confirmed', 'edit_confirmed_money', 'restore',
+    'settle_commission', 'view_full_phone', 'manage_roles', 'edit_shareholder', 'view_audit',
+  ],
+  manager: [
+    'create', 'edit_open', 'edit_nondefining', 'cancel_booking', 'undo_self_recent', 'export',
+    'view_full_phone', // 总经理与老板数据可见性完全一致
+  ],
+  finance: [
+    'create', 'edit_open', 'edit_nondefining', 'delete_soft', 'settle_commission', 'export',
+  ],
+  service: [
+    'create', 'edit_open', 'edit_nondefining', 'delete_soft', 'cancel_booking',
+  ],
+  view: [],
 };
 
 export interface Venue {
