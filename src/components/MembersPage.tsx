@@ -5,13 +5,14 @@ import { supabase } from '@/lib/supabase';
 import { MEMBER_LEVELS, STATUS_COLORS, VENUES } from '@/lib/constants';
 import { useAuth } from '@/lib/auth';
 import { Member, DEFAULT_DISCOUNTS, Bill, Order, formatDiscount, formatVenueDiscount } from '@/lib/types';
-import { softDelete, hardDelete, writeAuditLog } from '@/lib/audit';
+import { writeAuditLog } from '@/lib/audit';
+import { rpcHardDelete } from '@/lib/rpc';
 import { normalizeRows, n } from '@/lib/money';
 
 type ModalMode = null | 'create' | 'edit' | 'profile' | 'recharge';
 
 export default function MembersPage() {
-  const { role, can, roleLabel } = useAuth();
+  const { role, can, roleLabel, password } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [search, setSearch] = useState('');
   const [levelFilter, setLevelFilter] = useState('全部');
@@ -189,13 +190,15 @@ export default function MembersPage() {
   };
 
   const handleDeleteMember = async (m: Member) => {
+    if (!can('delete_soft')) {
+      alert('无权限：仅老板可删除会员');
+      return;
+    }
     if (!confirm(`确定要删除会员「${m.name}」吗？`)) return;
     const detail = `删除会员 ${m.name} (${m.level})`;
-    if (can('hard_delete')) {
-      await hardDelete('members', m.id, roleLabel, detail);
-    } else {
-      await softDelete('members', m.id, roleLabel, detail);
-    }
+    // 老板删除走 RPC（服务端密码校验）
+    const r = await rpcHardDelete('members', m.id, password, roleLabel, detail);
+    if (!r.ok) { alert('删除失败：' + r.error); return; }
     setModalMode(null);
     fetchMembers();
   };
@@ -518,7 +521,7 @@ export default function MembersPage() {
                 {can('edit') && (
                   <button onClick={() => openEdit(selectedMember)} className="text-xs text-[var(--blue)] hover:underline">编辑</button>
                 )}
-                {can('edit') && (
+                {can('delete_soft') && (
                   <button onClick={() => handleDeleteMember(selectedMember)} className="text-xs text-[var(--red)] hover:underline">删除</button>
                 )}
                 <button onClick={() => setModalMode(null)} className="text-[var(--ink3)] text-lg">✕</button>
