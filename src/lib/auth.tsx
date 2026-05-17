@@ -1,7 +1,33 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { Role, PASSWORDS, ROLE_LABELS, HARD_DELETE_PASSWORDS, ROLE_PAGES } from './constants';
+import {
+  Role,
+  PASSWORDS,
+  ROLE_LABELS,
+  HARD_DELETE_PASSWORDS,
+  ROLE_PAGES,
+  ROLE_PERMS,
+  PermAction,
+} from './constants';
+
+// 兼容旧调用：原来的 action 字符串映射到新的 PermAction
+type LegacyAction =
+  | 'edit'
+  | 'approve'
+  | 'finance_page'
+  | 'settle_commission'
+  | 'view_full_phone'
+  | 'hard_delete';
+
+const LEGACY_ACTION_MAP: Record<LegacyAction, PermAction | 'page_finance' | '_is_approve'> = {
+  edit: 'edit_open',                  // 兼容：旧 "edit" 等价于 "可编辑（未确认状态）"
+  approve: '_is_approve',             // 兼容：旧 "approve" 等价于"是不是老板"
+  finance_page: 'page_finance',       // 兼容：旧"能不能看财务页"
+  settle_commission: 'settle_commission',
+  view_full_phone: 'view_full_phone',
+  hard_delete: 'delete_hard',
+};
 
 interface AuthContextType {
   role: Role | null;
@@ -9,7 +35,9 @@ interface AuthContextType {
   password: string;
   login: (password: string) => boolean;
   logout: () => void;
-  can: (action: 'edit' | 'approve' | 'finance_page' | 'settle_commission' | 'view_full_phone' | 'hard_delete') => boolean;
+  /** 新 API：按权限动作判定 */
+  can: (action: PermAction | LegacyAction) => boolean;
+  /** 页面可见性 */
   canSeePage: (pageId: string) => boolean;
 }
 
@@ -35,27 +63,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const can = useCallback(
-    (action: 'edit' | 'approve' | 'finance_page' | 'settle_commission' | 'view_full_phone' | 'hard_delete') => {
+    (action: PermAction | LegacyAction) => {
       if (!role) return false;
-      switch (action) {
-        case 'edit':
-          // approve, finance, service can edit; view cannot
-          return role !== 'view';
-        case 'approve':
-          return role === 'approve';
-        case 'finance_page':
-          // Only approve and finance can see finance tab
-          return role === 'approve' || role === 'finance';
-        case 'settle_commission':
-          // Only approve and finance can settle commissions
-          return role === 'approve' || role === 'finance';
-        case 'view_full_phone':
-          return role === 'approve';
-        case 'hard_delete':
-          return HARD_DELETE_PASSWORDS.has(password);
-        default:
-          return false;
+
+      // 兼容旧调用
+      if (action in LEGACY_ACTION_MAP) {
+        const mapped = LEGACY_ACTION_MAP[action as LegacyAction];
+        if (mapped === '_is_approve') return role === 'approve';
+        if (mapped === 'page_finance') return role === 'approve' || role === 'manager' || role === 'finance';
+        if (mapped === 'delete_hard') {
+          // 硬删除：必须是 approve 且密码在白名单
+          return role === 'approve' && HARD_DELETE_PASSWORDS.has(password);
+        }
+        return ROLE_PERMS[role].includes(mapped as PermAction);
       }
+
+      // 新 API
+      return ROLE_PERMS[role].includes(action as PermAction);
     },
     [role, password]
   );

@@ -20,7 +20,7 @@ interface DeletedRecord {
 }
 
 export default function DashboardPage() {
-  const { roleLabel } = useAuth();
+  const { roleLabel, can } = useAuth();
   const [bills, setBills] = useState<(Bill & { order_type?: string })[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -98,6 +98,10 @@ export default function DashboardPage() {
   };
 
   const handleRestore = async (r: DeletedRecord) => {
+    if (!can('restore')) {
+      alert('无权限：仅老板可恢复已删除记录');
+      return;
+    }
     if (!confirm(`确定恢复「${r.label}」？`)) return;
     await restoreRecord(r.table, r.id, roleLabel, `恢复 ${r.label}`);
     loadDeletedRecords();
@@ -166,12 +170,14 @@ export default function DashboardPage() {
     <div className="flex flex-col h-full overflow-y-auto p-3 space-y-4">
       {/* Panel switcher */}
       <div className="flex gap-2">
-        {[
+        {([
           { id: 'dashboard' as Panel, label: '数据总览' },
-          { id: 'audit' as Panel, label: '操作日志' },
-          { id: 'deleted' as Panel, label: '已删除数据' },
+          { id: 'audit' as Panel, label: '操作日志', need: 'view_audit' as const },
+          { id: 'deleted' as Panel, label: '已删除数据', need: 'restore' as const },
           { id: 'changelog' as Panel, label: `更新日志 ${APP_VERSION}` },
-        ].map((tab) => (
+        ] as { id: Panel; label: string; need?: 'view_audit' | 'restore' }[])
+          .filter((tab) => !tab.need || can(tab.need))
+          .map((tab) => (
           <button key={tab.id} onClick={() => switchPanel(tab.id)}
             className={`px-3 py-1.5 text-xs rounded-md border transition
               ${panel === tab.id

@@ -5,7 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { VENUES, STATUS_COLORS, ORDER_TYPES, ACTIONS, MEMBER_LEVELS, ALL_SLOTS } from '@/lib/constants';
 import { useAuth } from '@/lib/auth';
 import { Order, Bill, Member, DEFAULT_DISCOUNTS, PAYMENT_METHODS } from '@/lib/types';
-import { softDelete, hardDelete, writeAuditLog } from '@/lib/audit';
+import { writeAuditLog } from '@/lib/audit';
+import { rpcHardDelete } from '@/lib/rpc';
 import { normalizeRow } from '@/lib/money';
 
 interface Props {
@@ -17,7 +18,7 @@ interface Props {
 type Mode = 'detail' | 'edit' | 'bill';
 
 export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props) {
-  const { can, roleLabel } = useAuth();
+  const { can, roleLabel, password } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [bill, setBill] = useState<Bill | null>(null);
   const [member, setMember] = useState<Member | null>(null);
@@ -108,11 +109,18 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
     if (!confirm('确定要删除这个订单吗？')) return;
     const detail = `删除订单 #${orderId} (${order.client} ${order.date} ${order.slot})`;
     if (can('hard_delete')) {
-      // Also delete associated bill
-      await supabase.from('bills').delete().eq('order_id', orderId);
-      await hardDelete('orders', orderId, roleLabel, detail);
+      // 老板：硬删除走服务端 RPC（带密码校验）
+      const bill = await supabase.from('bills').select('id').eq('order_id', orderId).maybeSingle();
+      if (bill.data?.id) {
+        await rpcHardDelete('bills', bill.data.id, password, roleLabel, `级联删除 bill #${bill.data.id}`);
+      }
+      const r = await rpcHardDelete('orders', orderId, password, roleLabel, detail);
+      if (!r.ok) { alert('删除失败：' + r.error); return; }
     } else {
-      await softDelete('orders', orderId, roleLabel, detail);
+      // 老板之外的角色不应该看到删除按钮（前端已 PermissionGate 拦截）
+      // 双重保险：再次拒绝
+      alert('无权限：仅老板可删除订单');
+      return;
     }
     onUpdated();
   };
@@ -491,7 +499,7 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
             {can('edit') && (order.status === '已确认' || order.status === '待结账') && (
               <button onClick={startBill} className="text-xs text-[var(--purple)] hover:underline">结账</button>
             )}
-            {can('edit') && (
+            {can('delete_soft') && (
               <button onClick={handleDelete} className="text-xs text-[var(--red)] hover:underline">删除</button>
             )}
             <button onClick={onClose} className="text-[var(--ink3)] text-lg">✕</button>
