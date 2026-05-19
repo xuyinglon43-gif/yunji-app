@@ -1,4 +1,4 @@
-export const APP_VERSION = 'v2.2';
+export const APP_VERSION = 'v2.3';
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: 'v2.3',
+    date: '2026-05-19',
+    changes: [
+      '结账时可选择"账单日期"（默认订单消费日期），解决跨月结账导致收入归错月份',
+      '财务可删除"待入账"错单（订单退回"待结账"可重新结账），可撤销"已入账"账单（退回"待入账"）',
+      '提交支出的"供应商/收款方"接入本地档案，自动补全 + 一键选择历史值',
+    ],
+  },
   {
     version: 'v2.2',
     date: '2026-04-16',
