@@ -63,7 +63,7 @@ export const ROLE_PERMS: Record<Role, PermAction[]> = {
     'view_full_phone', // 总经理与老板数据可见性完全一致
   ],
   finance: [
-    'create', 'edit_open', 'edit_nondefining', 'delete_soft', 'settle_commission', 'export',
+    'create', 'edit_open', 'edit_nondefining', 'delete_soft', 'undo_confirmed', 'settle_commission', 'export',
   ],
   service: [
     'create', 'edit_open', 'edit_nondefining', 'delete_soft', 'cancel_booking',

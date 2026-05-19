@@ -30,6 +30,7 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
 
   // Bill form state
   const [billForm, setBillForm] = useState({
+    bill_date: '',
     total: '',
     food_cost: '',
     method: '微信',
@@ -163,6 +164,7 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
   const startBill = () => {
     const defaultFoodCost = order.estimated ? Math.round(order.estimated * 0.33) : 0;
     setBillForm({
+      bill_date: order.date,
       total: '',
       food_cost: defaultFoodCost > 0 ? String(defaultFoodCost) : '',
       method: '微信',
@@ -219,9 +221,10 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
     }
 
     // Create bill record
+    // 账单日期：默认订单消费日期，财务可手动调整（避免跨月结账导致收入归错月份）
     await supabase.from('bills').insert({
       order_id: orderId,
-      date: new Date().toISOString().split('T')[0],
+      date: billForm.bill_date || order.date,
       total,
       discount: 100,
       food_cost,
@@ -388,6 +391,15 @@ export default function OrderDetailModal({ orderId, onClose, onUpdated }: Props)
                 套餐预计总价：¥{order.estimated.toLocaleString()} · 食材成本已按33%自动填入
               </div>
             )}
+            <label className="block">
+              <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">
+                账单日期
+                <span className="ml-1 font-normal text-[var(--ink3)]">（默认消费日期，跨月结账请改成实际消费日）</span>
+              </span>
+              <input type="date" value={billForm.bill_date}
+                onChange={(e) => setBillForm((f) => ({ ...f, bill_date: e.target.value }))}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
+            </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">实收金额 *</span>

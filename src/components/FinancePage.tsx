@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { Bill, Expense, EXPENSE_CATEGORIES, ExpenseItem } from '@/lib/types';
 import { normalizeRow, normalizeRows } from '@/lib/money';
+import { softDelete, writeAuditLog } from '@/lib/audit';
 
 // 收款方式颜色映射
 const METHOD_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
@@ -28,6 +29,7 @@ export default function FinancePage() {
   const [tab, setTab] = useState<'overview' | 'income' | 'expense'>('overview');
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState('');
+  const [supplierHistory, setSupplierHistory] = useState<string[]>([]);
   const [expForm, setExpForm] = useState({
     date: new Date().toISOString().split('T')[0],
     period: new Date().toISOString().slice(0, 7),
@@ -40,11 +42,30 @@ export default function FinancePage() {
 
   const thisMonth = new Date().toISOString().slice(0, 7);
 
-  // 加载自定义类目
+  // 加载自定义类目 + 供应商历史档案
   useEffect(() => {
     const saved = localStorage.getItem('yunji_custom_expense_categories');
     if (saved) setCustomCategories(JSON.parse(saved));
+    const savedSuppliers = localStorage.getItem('yunji_supplier_history');
+    if (savedSuppliers) setSupplierHistory(JSON.parse(savedSuppliers));
   }, []);
+
+  // 把当前供应商加入档案（已存在则忽略）
+  const rememberSupplier = (name: string) => {
+    const n = name.trim();
+    if (!n || supplierHistory.includes(n)) return;
+    const updated = [...supplierHistory, n];
+    setSupplierHistory(updated);
+    localStorage.setItem('yunji_supplier_history', JSON.stringify(updated));
+  };
+
+  // 删除某个供应商档案
+  const removeSupplier = (name: string) => {
+    if (!confirm(`从档案中删除「${name}」？`)) return;
+    const updated = supplierHistory.filter((s) => s !== name);
+    setSupplierHistory(updated);
+    localStorage.setItem('yunji_supplier_history', JSON.stringify(updated));
+  };
 
   const allCategories = useMemo(() => {
     return [...EXPENSE_CATEGORIES, ...customCategories];
@@ -119,6 +140,25 @@ export default function FinancePage() {
     ]).then(() => fetchData());
   };
 
+  // 删除错的待入账账单：软删 bill + 订单状态回退「待结账」，可重新结账
+  const deleteBill = async (bill: Bill & { order_client?: string }) => {
+    if (!confirm(`确定删除「${bill.order_client || '该账单'}」的账单吗？\n订单会退回到「待结账」状态，可重新结账。`)) return;
+    setPendingBills((prev) => prev.filter((b) => b.id !== bill.id));
+    await softDelete('bills', bill.id, roleLabel, `删除待入账账单 #${bill.id} (${bill.order_client || ''} ¥${bill.paid})`);
+    await supabase.from('orders').update({ status: '待结账' }).eq('id', bill.order_id);
+    fetchData();
+  };
+
+  // 撤销已入账：把 confirmed 退回 false，订单状态退回「已收款」（即待入账状态）
+  const undoConfirmBill = async (bill: Bill & { order_client?: string }) => {
+    if (!confirm(`确定撤销「${bill.order_client || '该账单'}」的入账确认吗？\n账单会退回到「待入账」，可重新核对或删除。`)) return;
+    setConfirmedBills((prev) => prev.filter((b) => b.id !== bill.id));
+    await supabase.from('bills').update({ confirmed: false, confirmed_at: null }).eq('id', bill.id);
+    await supabase.from('orders').update({ status: '已收款' }).eq('id', bill.order_id);
+    await writeAuditLog('bills', bill.id, '撤销确认', `撤销已入账账单 #${bill.id} (${bill.order_client || ''} ¥${bill.paid})`, roleLabel);
+    fetchData();
+  };
+
   const approveExpense = (id: number) => {
     setPendingExpenses((prev) => prev.filter((e) => e.id !== id));
     supabase.from('expenses').update({ status: '已审批', approved_by: roleLabel }).eq('id', id).then(() => fetchData());
@@ -133,6 +173,7 @@ export default function FinancePage() {
     const amount = parseFloat(expForm.amount) || 0;
     if (amount <= 0) return alert('请填写金额');
     if (!expForm.category) return alert('请选择类别');
+    if (expForm.supplier) rememberSupplier(expForm.supplier);
     const isEditing = editingExpenseId !== null;
     const editId = editingExpenseId;
     const savedItems = [...expItems];
@@ -428,6 +469,12 @@ export default function FinancePage() {
                             确认入账
                           </button>
                         )}
+                        {can('delete_soft') && (
+                          <button onClick={() => deleteBill(b)}
+                            className="px-2 py-1 text-[11px] border border-[var(--red-border)] text-[var(--red)] rounded hover:bg-[var(--red-bg)]">
+                            删除
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -451,7 +498,15 @@ export default function FinancePage() {
                       <span className={`text-[10px] px-1.5 py-0.5 rounded ${mc.bg} ${mc.text}`}>{b.method}</span>
                       <span className="text-[var(--ink3)] text-xs">{b.date}</span>
                     </div>
-                    <span className="font-medium text-sm text-[#004085]">¥{b.paid.toLocaleString()}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm text-[#004085]">¥{b.paid.toLocaleString()}</span>
+                      {can('undo_confirmed') && (
+                        <button onClick={() => undoConfirmBill(b)}
+                          className="px-2 py-1 text-[11px] border border-[var(--border)] text-[var(--ink2)] rounded hover:bg-[var(--bg)]">
+                          撤销
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -585,9 +640,25 @@ export default function FinancePage() {
                 </label>
                 <label className="block">
                   <span className="text-[11px] font-medium text-[var(--ink2)] mb-1 block">供应商/收款方</span>
-                  <input type="text" value={expForm.supplier} onChange={(e) => setExpForm((f) => ({ ...f, supplier: e.target.value }))}
-                    placeholder="供应商或收款方名称"
+                  <input type="text" list="supplier-history" value={expForm.supplier} onChange={(e) => setExpForm((f) => ({ ...f, supplier: e.target.value }))}
+                    placeholder="输入或从档案选择"
                     className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm focus:outline-none focus:border-[var(--ink3)]" />
+                  <datalist id="supplier-history">
+                    {supplierHistory.map((s) => <option key={s} value={s} />)}
+                  </datalist>
+                  {supplierHistory.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {supplierHistory.map((s) => (
+                        <button key={s} type="button"
+                          onClick={() => setExpForm((f) => ({ ...f, supplier: s }))}
+                          onContextMenu={(e) => { e.preventDefault(); removeSupplier(s); }}
+                          title="点击使用，右键/长按移除"
+                          className={`px-1.5 py-0.5 text-[10px] rounded border ${expForm.supplier === s ? 'bg-[var(--green)] text-white border-[var(--green)]' : 'bg-[var(--bg)] border-[var(--border)] text-[var(--ink2)]'}`}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </label>
               </div>
               <label className="block">
