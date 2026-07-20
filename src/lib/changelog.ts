@@ -1,4 +1,4 @@
-export const APP_VERSION = 'v2.3';
+export const APP_VERSION = 'v2.4';
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: 'v2.4',
+    date: '2026-07-20',
+    changes: [
+      '新增"日报"页面：一键生成未来5天预定图片，长按/下载后转发微信群，代替手动截图',
+      '日报分全员版（不含金额）和老板版（含预估营收/定金汇总），老板/总经理可切换',
+    ],
+  },
   {
     version: 'v2.3',
     date: '2026-05-19',

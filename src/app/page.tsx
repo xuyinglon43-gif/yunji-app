@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth';
 import LoginScreen from '@/components/LoginScreen';
 import Navigation from '@/components/Navigation';
 import Schedule from '@/components/Schedule';
+import DailyReportPage from '@/components/DailyReportPage';
 import OrdersPage from '@/components/OrdersPage';
 import MembersPage from '@/components/MembersPage';
 import FinancePage from '@/components/FinancePage';
@@ -32,6 +33,7 @@ export default function Home() {
     switch (currentPage) {
       case 'home': return <HomePage />;
       case 'schedule': return <Schedule />;
+      case 'report': return <DailyReportPage />;
       case 'orders': return <OrdersPage />;
       case 'finance': return <FinancePage />;
       case 'members': return <MembersPage />;

@@ -10,6 +10,7 @@ interface NavigationProps {
 const NAV_ITEMS = [
   { id: 'home', label: '首页', icon: '☶' },
   { id: 'schedule', label: '档期', icon: '☷' },
+  { id: 'report', label: '日报', icon: '☴' },
   { id: 'orders', label: '订单', icon: '☰' },
   { id: 'finance', label: '财务', icon: '◆' },
   { id: 'members', label: '会员', icon: '●' },

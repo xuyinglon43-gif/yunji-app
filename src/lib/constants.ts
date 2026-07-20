@@ -23,11 +23,11 @@ export const ROLE_LABELS: Record<Role, string> = {
 // 业务页面：总经理与老板可见相同（含 dashboard/analytics）。
 // 老板还独享 audit/shareholder/settings 三个治理页面。
 export const ROLE_PAGES: Record<Role, string[]> = {
-  approve: ['home', 'schedule', 'orders', 'finance', 'members', 'business', 'dashboard', 'analytics', 'audit', 'shareholder', 'settings'],
-  manager: ['home', 'schedule', 'orders', 'finance', 'members', 'business', 'dashboard', 'analytics'],
-  finance: ['home', 'schedule', 'orders', 'finance', 'members', 'business'],
-  service: ['home', 'schedule', 'orders', 'members'],
-  view:    ['home', 'schedule', 'orders', 'members'],
+  approve: ['home', 'schedule', 'report', 'orders', 'finance', 'members', 'business', 'dashboard', 'analytics', 'audit', 'shareholder', 'settings'],
+  manager: ['home', 'schedule', 'report', 'orders', 'finance', 'members', 'business', 'dashboard', 'analytics'],
+  finance: ['home', 'schedule', 'report', 'orders', 'finance', 'members', 'business'],
+  service: ['home', 'schedule', 'report', 'orders', 'members'],
+  view:    ['home', 'schedule', 'report', 'orders', 'members'],
 };
 
 // 权限动作清单（按"治理 vs 经营"二分）

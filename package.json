@@ -11,6 +11,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.99.2",
     "@tremor/react": "^3.18.7",
+    "html-to-image": "^1.11.13",
     "next": "14.2.35",
     "react": "^18",
     "react-dom": "^18"
