@@ -1,4 +1,4 @@
-export const APP_VERSION = 'v2.4';
+export const APP_VERSION = 'v2.5';
 
 export interface ChangelogEntry {
   version: string;
@@ -7,6 +7,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: 'v2.5',
+    date: '2026-07-20',
+    changes: [
+      '日报页改版为"每日经营汇报"：场地×日期网格视图（与档期页同款），一键下载/复制图片发微信群',
+      '管理层版新增本月经营进度：目标/已完成/时间进度/剩余日均需完成/昨日回顾（需执行SQL迁移 migrate_v2.5_monthly_targets.sql）',
+      '本月目标由团队在日报页自行填写（单位：万），未填默认50万',
+    ],
+  },
   {
     version: 'v2.4',
     date: '2026-07-20',
